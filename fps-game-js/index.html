@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JS FPS Demo</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="overlay">
+    <h1>JS FPS Demo</h1>
+    <p>WASD or arrow keys to move, Space to jump, click the screen to enable the camera lock and look around.</p>
+    <p id="status">Status: click to start</p>
+    <p id="instructions">Camera lock is active after click. Move the mouse to look around normally.</p>
+  </div>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
