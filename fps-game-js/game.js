@@ -212,10 +212,31 @@ scoreDisplay.style.fontFamily = 'monospace';
 scoreDisplay.style.fontSize = '18px';
 document.body.appendChild(scoreDisplay);
 
+const goldDisplay = document.createElement('div');
+goldDisplay.id = 'goldDisplay';
+goldDisplay.style.position = 'absolute';
+goldDisplay.style.top = '110px';
+goldDisplay.style.left = '10px';
+goldDisplay.style.color = 'white';
+goldDisplay.style.fontFamily = 'monospace';
+goldDisplay.style.fontSize = '18px';
+document.body.appendChild(goldDisplay);
+
+const shopPromptDisplay = document.createElement('div');
+shopPromptDisplay.id = 'shopPromptDisplay';
+shopPromptDisplay.style.position = 'absolute';
+shopPromptDisplay.style.top = '160px';
+shopPromptDisplay.style.left = '10px';
+shopPromptDisplay.style.color = '#fff3b0';
+shopPromptDisplay.style.fontFamily = 'monospace';
+shopPromptDisplay.style.fontSize = '16px';
+shopPromptDisplay.style.pointerEvents = 'none';
+document.body.appendChild(shopPromptDisplay);
+
 const playerHealthDisplay = document.createElement('div');
 playerHealthDisplay.id = 'playerHealthDisplay';
 playerHealthDisplay.style.position = 'absolute';
-playerHealthDisplay.style.top = '85px';
+playerHealthDisplay.style.top = '185px';
 playerHealthDisplay.style.left = '10px';
 playerHealthDisplay.style.color = 'white';
 playerHealthDisplay.style.fontFamily = 'monospace';
@@ -227,8 +248,148 @@ function updateGameUI() {
   roundDisplay.textContent = `Round: ${currentRound}`;
   enemiesDisplay.textContent = `Enemies: ${enemiesRemaining}`;
   scoreDisplay.textContent = `Score: ${score}`;
+  goldDisplay.textContent = `Gold: ${goldCount}`;
   playerHealthDisplay.textContent = `Health: ${player.health}/${player.maxHealth}`;
 }
+
+const shopState = {
+  open: false,
+  position: new THREE.Vector3(0, 0, 24),
+  radius: 4,
+};
+
+const shopOverlay = document.createElement('div');
+shopOverlay.id = 'shopOverlay';
+shopOverlay.style.position = 'absolute';
+shopOverlay.style.top = '50%';
+shopOverlay.style.left = '50%';
+shopOverlay.style.transform = 'translate(-50%, -50%)';
+shopOverlay.style.minWidth = '320px';
+shopOverlay.style.background = 'rgba(20, 16, 10, 0.94)';
+shopOverlay.style.border = '1px solid rgba(255, 215, 0, 0.6)';
+shopOverlay.style.borderRadius = '14px';
+shopOverlay.style.padding = '18px';
+shopOverlay.style.color = '#f8e7b6';
+shopOverlay.style.fontFamily = 'monospace';
+shopOverlay.style.fontSize = '16px';
+shopOverlay.style.display = 'none';
+shopOverlay.style.zIndex = '20';
+shopOverlay.style.boxShadow = '0 0 36px rgba(255, 215, 0, 0.2)';
+document.body.appendChild(shopOverlay);
+
+const shopTitle = document.createElement('div');
+shopTitle.textContent = 'Shop';
+shopTitle.style.fontSize = '20px';
+shopTitle.style.marginBottom = '10px';
+shopOverlay.appendChild(shopTitle);
+
+const shopMessage = document.createElement('div');
+shopMessage.style.minHeight = '22px';
+shopMessage.style.marginBottom = '12px';
+shopMessage.style.color = '#ffdb76';
+shopOverlay.appendChild(shopMessage);
+
+const shopItems = [
+  { id: 'health', label: 'Max Health +20', cost: 10, buy() { player.maxHealth += 20; player.health = Math.min(player.health + 20, player.maxHealth); } },
+  { id: 'speed', label: 'Move Speed +1', cost: 15, buy() { player.speed += 1; } },
+  { id: 'damage', label: 'Attack Damage +10', cost: 20, buy() { player.attackDamage += 10; } },
+  { id: 'jump', label: 'Jump Height +2', cost: 12, buy() { player.jumpSpeed += 2; } },
+  { id: 'heal', label: 'Heal Fully', cost: 5, buy() { player.health = player.maxHealth; } },
+];
+
+shopItems.forEach((item) => {
+  const button = document.createElement('button');
+  button.textContent = `${item.label} — ${item.cost} gold`;
+  button.style.display = 'block';
+  button.style.width = '100%';
+  button.style.marginBottom = '10px';
+  button.style.padding = '10px';
+  button.style.border = '1px solid rgba(255, 215, 0, 0.4)';
+  button.style.background = 'rgba(45, 35, 18, 0.97)';
+  button.style.color = '#ffe8a0';
+  button.style.cursor = 'pointer';
+  button.style.fontFamily = 'monospace';
+  button.style.fontSize = '14px';
+  button.addEventListener('click', () => {
+    if (goldCount >= item.cost) {
+      goldCount -= item.cost;
+      item.buy();
+      shopMessage.textContent = `Purchased ${item.label}.`;
+      updateGameUI();
+    } else {
+      shopMessage.textContent = `Not enough gold for ${item.label}.`;
+    }
+  });
+  shopOverlay.appendChild(button);
+});
+
+const shopCloseButton = document.createElement('button');
+shopCloseButton.textContent = 'Close Shop';
+shopCloseButton.style.display = 'block';
+shopCloseButton.style.width = '100%';
+shopCloseButton.style.padding = '10px';
+shopCloseButton.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+shopCloseButton.style.background = 'rgba(255, 255, 255, 0.08)';
+shopCloseButton.style.color = '#fff';
+shopCloseButton.style.cursor = 'pointer';
+shopCloseButton.style.marginTop = '8px';
+shopCloseButton.addEventListener('click', () => toggleShop(false));
+shopOverlay.appendChild(shopCloseButton);
+
+function toggleShop(open) {
+  shopState.open = open;
+  shopOverlay.style.display = open ? 'block' : 'none';
+  shopPromptDisplay.style.display = open ? 'none' : 'block';
+  shopMessage.textContent = '';
+}
+
+function isPlayerNearShop() {
+  return player.position.distanceTo(shopState.position) < shopState.radius;
+}
+
+function updateShopPrompt() {
+  if (shopState.open) {
+    shopPromptDisplay.textContent = '';
+    return;
+  }
+  shopPromptDisplay.textContent = isPlayerNearShop() ? 'Press E to open the shop' : '';
+}
+
+function addShopDecoration() {
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.2, 2.2, 0.6, 24),
+    new THREE.MeshStandardMaterial({ color: 0x42321d, roughness: 0.9, metalness: 0.15 })
+  );
+  base.position.set(shopState.position.x, 0.3, shopState.position.z);
+  base.receiveShadow = true;
+  scene.add(base);
+
+  const stand = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 1.2, 1.6),
+    new THREE.MeshStandardMaterial({ color: 0x593d21, roughness: 0.7, metalness: 0.08 })
+  );
+  stand.position.set(shopState.position.x, 1.0, shopState.position.z);
+  stand.castShadow = true;
+  stand.receiveShadow = true;
+  scene.add(stand);
+
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 1, 0.2),
+    new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x3a2500, roughness: 0.4, metalness: 0.9 })
+  );
+  sign.position.set(shopState.position.x, 2.1, shopState.position.z);
+  scene.add(sign);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.7, 0.18, 16, 30),
+    goldMaterial
+  );
+  ring.position.set(shopState.position.x, 2.8, shopState.position.z);
+  ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+}
+
+addShopDecoration();
 
 function startNextWave() {
   currentRound++;
@@ -278,6 +439,35 @@ function startNextWave() {
 const enemies = [];
 const fragments = [];
 const projectiles = [];
+const golds = [];
+let goldCount = 0;
+
+const goldMaterial = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x553300, roughness: 0.25, metalness: 1 });
+
+function createGold(x, z, amount = 1) {
+  const geometry = new THREE.TorusGeometry(0.5, 0.18, 16, 30);
+  const mesh = new THREE.Mesh(geometry, goldMaterial);
+  mesh.position.set(x, 0.8, z);
+  mesh.rotation.x = Math.PI / 2;
+  mesh.userData.amount = amount;
+  mesh.userData.spinSpeed = 1.5 + Math.random() * 1.5;
+  scene.add(mesh);
+  golds.push(mesh);
+  return mesh;
+}
+
+function collectGold(gold) {
+  goldCount += gold.userData.amount;
+  score += gold.userData.amount * 5;
+  scene.remove(gold);
+  const index = golds.indexOf(gold);
+  if (index !== -1) golds.splice(index, 1);
+  updateGameUI();
+}
+
+for (const pos of [{ x: -20, z: 20 }, { x: 20, z: 20 }, { x: -20, z: -20 }, { x: 20, z: -20 }]) {
+  createGold(pos.x, pos.z, 3);
+}
 
 function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1) {
   const group = new THREE.Group();
@@ -502,6 +692,7 @@ const player = {
   mouseLocked: false,
   health: 100,
   maxHealth: 100,
+  attackDamage: 34,
   damageCooldown: 0, // Cooldown for taking damage from enemies
 };
 
@@ -612,8 +803,15 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = Math.min(clock.getDelta(), 0.03);
   mixer.update(delta);
+  updateShopPrompt();
 
   // --- Wave Management ---
+  if (shopState.open) {
+    updateStatus();
+    renderer.render(scene, camera);
+    return;
+  }
+
   if (!waveActive && enemies.length === 0 && fragments.length === 0) { // Wait for fragments to clear too
     if (waveDelayTimer <= 0) {
       // waveActive is already false here, as per the outer 'if' condition
@@ -780,6 +978,15 @@ function animate() {
   enemies.length = 0;
   enemies.push(...enemiesToKeep);
 
+  // Update gold pickups
+  for (let i = golds.length - 1; i >= 0; i--) {
+    const gold = golds[i];
+    gold.rotation.y += gold.userData.spinSpeed * delta;
+    if (gold.position.distanceTo(player.position) < 1.4) {
+      collectGold(gold);
+    }
+  }
+
   // Update death fragments
   for (let i = fragments.length - 1; i >= 0; i--) {
     const frag = fragments[i];
@@ -893,6 +1100,13 @@ window.addEventListener('keydown', (event) => {
     case 'ShiftRight':
       keys.shift = true;
       break;
+    case 'KeyE':
+      if (shopState.open) {
+        toggleShop(false);
+      } else if (isPlayerNearShop()) {
+        toggleShop(true);
+      }
+      break;
   }
 });
 
@@ -932,6 +1146,7 @@ window.addEventListener('mousemove', (event) => {
 });
 
 function checkAttack() {
+  if (shopState.open) return;
   // Get the direction the camera is facing
   const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   // Define the center of the attack area in front of the player
@@ -950,7 +1165,7 @@ function checkAttack() {
     const enemyBox = new THREE.Box3().setFromObject(enemy);
 
     if (attackBox.intersectsBox(enemyBox)) {
-      if (damageEnemy(enemy, 34)) { // Apply damage, check if defeated
+      if (damageEnemy(enemy, player.attackDamage)) { // Apply damage, check if defeated
         enemies.splice(i, 1); // Remove from array if defeated
       }
       // Trigger knockback effect
