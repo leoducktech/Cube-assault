@@ -389,8 +389,6 @@ function addShopDecoration() {
   scene.add(ring);
 }
 
-addShopDecoration();
-
 function startNextWave() {
   currentRound++;
   if (currentRound > waves.length) {
@@ -456,6 +454,8 @@ function createGold(x, z, amount = 1) {
   return mesh;
 }
 
+addShopDecoration();
+
 function collectGold(gold) {
   goldCount += gold.userData.amount;
   score += gold.userData.amount * 5;
@@ -465,7 +465,16 @@ function collectGold(gold) {
   updateGameUI();
 }
 
-for (const pos of [{ x: -20, z: 20 }, { x: 20, z: 20 }, { x: -20, z: -20 }, { x: 20, z: -20 }]) {
+for (const pos of [
+  { x: -20, z: 20 },
+  { x: 20, z: 20 },
+  { x: -20, z: -20 },
+  { x: 20, z: -20 },
+  { x: -12, z: 18 },
+  { x: 12, z: 18 },
+  { x: -12, z: -18 },
+  { x: 12, z: -18 },
+]) {
   createGold(pos.x, pos.z, 3);
 }
 
@@ -586,6 +595,12 @@ function damageEnemy(enemy, amount) {
 
   if (enemy.userData.health <= 0) {
     createExplosion(enemy.position, enemy.userData.color);
+    const dropCount = enemy.userData.baseScale > 1 ? 4 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < dropCount; i++) {
+      const offsetX = (Math.random() - 0.5) * 2;
+      const offsetZ = (Math.random() - 0.5) * 2;
+      createGold(enemy.position.x + offsetX, enemy.position.z + offsetZ, 1);
+    }
     scene.remove(enemy);
     if (enemy.userData.helper) scene.remove(enemy.userData.helper);
     
