@@ -6,7 +6,7 @@
     <title>Login | Cube Assault</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body class="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-zinc-950 to-black text-amber-100 font-sans">
+  <body class="relative min-h-screen bg-gradient-to-br from-slate-950 via-zinc-950 to-black text-amber-100 font-sans">
     <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.18),_transparent_20%),radial-gradient(circle_at_bottom_right,_rgba(34,197,94,0.14),_transparent_22%)]"></div>
     <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(248,209,77,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(248,209,77,0.06)_1px,transparent_1px)] bg-[length:80px_80px] opacity-20"></div>
     <div class="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
@@ -53,7 +53,10 @@
         </div>
 
         <div class="mt-8 flex flex-col gap-3 text-sm text-amber-200/80 sm:flex-row sm:items-center sm:justify-between">
-          <a href="index.html" class="text-amber-300 transition hover:text-amber-100">&larr; Back to Game</a>
+          <div class="space-x-4 text-center sm:text-left">
+            <a href="index.html" class="text-amber-300 transition hover:text-amber-100">&larr; Back to Game</a>
+            <a href="signup.html" class="text-amber-300 transition hover:text-amber-100">Create account</a>
+          </div>
           <span class="inline-flex rounded-full border border-amber-400/15 bg-amber-400/5 px-3 py-1 uppercase tracking-[0.2em] text-amber-200">Arena Ready</span>
         </div>
       </div>
