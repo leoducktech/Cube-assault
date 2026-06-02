@@ -8,8 +8,8 @@ html, body {
   height: 100%;
   overflow: hidden;
   font-family: Arial, sans-serif;
-  background: radial-gradient(circle at top, #6f5b3f 0%, #1f170f 45%, #090603 100%);
-  color: #f5e4cb;
+  background: radial-gradient(circle at top, #1a0f35 0%, #050113 38%, #000000 100%);
+  color: #d3f8ff;
 }
 body {
   cursor: crosshair;
@@ -44,12 +44,13 @@ body::after {
   left: 12px;
   top: 12px;
   z-index: 10;
-  background: rgba(25, 18, 12, 0.86);
-  border: 1px solid rgba(244, 219, 163, 0.34);
+  background: rgba(6, 6, 25, 0.92);
+  border: 1px solid rgba(68, 212, 255, 0.35);
   border-radius: 14px;
   padding: 16px;
   max-width: 380px;
   backdrop-filter: blur(6px);
+  box-shadow: 0 0 20px rgba(68, 212, 255, 0.12);
 }
 #overlay h1 {
   font-size: 1.2rem;

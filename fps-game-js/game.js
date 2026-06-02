@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x4a3a27);
-scene.fog = new THREE.FogExp2(0x4a3a27, 0.015);
+scene.background = new THREE.Color(0x11163d);
+scene.fog = new THREE.FogExp2(0x11163d, 0.0075);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -11,7 +11,7 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.setClearColor(0x4a3a27);
+renderer.setClearColor(0x11163d);
 document.body.appendChild(renderer.domElement);
 
 const overlay = document.getElementById('overlay');
@@ -22,81 +22,121 @@ window.addEventListener('error', (event) => {
   overlay.style.display = 'block';
 });
 
-const ambient = new THREE.AmbientLight(0xf2e2c8, 0.45);
+const ambient = new THREE.AmbientLight(0x99e4ff, 0.45);
 scene.add(ambient);
-const hemi = new THREE.HemisphereLight(0xfff1d0, 0x332820, 0.7);
+const hemi = new THREE.HemisphereLight(0xab92ff, 0x17204d, 0.55);
 scene.add(hemi);
-const dirLight = new THREE.DirectionalLight(0xffe9c1, 1.0);
-dirLight.position.set(6, 14, 7);
+const dirLight = new THREE.DirectionalLight(0xb8f2ff, 1.4);
+dirLight.position.set(6, 18, 6);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(1024, 1024);
 scene.add(dirLight);
 
-function createStoneTexture() {
+const neonGlow = new THREE.PointLight(0x7ed8ff, 0.55, 50, 1.5);
+neonGlow.position.set(0, 12, 0);
+scene.add(neonGlow);
+
+const fillGlow = new THREE.PointLight(0xd786ff, 0.35, 40, 1.7);
+fillGlow.position.set(0, 6, 0);
+scene.add(fillGlow);
+
+function createNeonFloorTexture() {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#7b6a53';
+  ctx.fillStyle = '#03040f';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 1000; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const shade = 40 + Math.random() * 20;
-    ctx.fillStyle = `rgba(${shade}, ${shade - 5}, ${shade - 20}, ${0.08 + Math.random() * 0.12})`;
-    ctx.fillRect(x, y, 2, 2);
-  }
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 20; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const len = 20 + Math.random() * 40;
-    const angle = Math.random() * Math.PI * 2;
+
+  const step = 32;
+  for (let i = 0; i <= size; i += step) {
+    ctx.strokeStyle = i % (step * 2) === 0 ? 'rgba(80, 245, 255, 0.48)' : 'rgba(120, 65, 255, 0.30)';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, size);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(size, i);
     ctx.stroke();
   }
+
+  for (let i = 0; i < 120; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const alpha = 0.18 + Math.random() * 0.18;
+    ctx.fillStyle = `rgba(190, 110, 255, ${alpha})`;
+    ctx.fillRect(x, y, 2.4, 2.4);
+  }
+
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(12, 12);
+  texture.repeat.set(18, 18);
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return texture;
 }
 
-function createCarvingTexture() {
+function createNeonWallTexture() {
   const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#8d7359';
+  ctx.fillStyle = '#121139';
   ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+
+  ctx.strokeStyle = 'rgba(120, 255, 255, 0.35)';
   ctx.lineWidth = 2;
-  for (let x = 16; x < size; x += 32) {
-    for (let y = 16; y < size; y += 32) {
-      ctx.beginPath();
-      ctx.arc(x, y, 6 + Math.random() * 4, 0, Math.PI * 2);
-      ctx.stroke();
-    }
+  for (let i = 18; i < size; i += 36) {
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(size, i);
+    ctx.stroke();
   }
-  return new THREE.CanvasTexture(canvas);
+
+  ctx.strokeStyle = 'rgba(245, 110, 255, 0.32)';
+  ctx.lineWidth = 1.5;
+  for (let i = 20; i < size; i += 44) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, size);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    ctx.fillStyle = `rgba(181, 255, 255, ${0.08 + Math.random() * 0.1})`;
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 3);
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return texture;
 }
 
-const floorTexture = createStoneTexture();
+const floorTexture = createNeonFloorTexture();
 const floor = new THREE.Mesh(
   new THREE.BoxGeometry(90, 1, 90),
-  new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.95, metalness: 0.03 })
+  new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.75, metalness: 0.35, color: 0x040511 })
 );
 floor.position.y = -0.5;
 floor.receiveShadow = true;
 scene.add(floor);
 
 const walls = [];
-const stoneMaterial = new THREE.MeshStandardMaterial({ map: createCarvingTexture(), roughness: 0.82, metalness: 0.06, color: 0xbf9b73 });
+const stoneMaterial = new THREE.MeshStandardMaterial({
+  map: createNeonWallTexture(),
+  emissive: 0x4900ff,
+  emissiveIntensity: 0.7,
+  roughness: 0.32,
+  metalness: 0.8,
+  color: 0x0b0520,
+});
 
 function addBlock(x, z, width, height, depth) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), stoneMaterial);
@@ -178,9 +218,33 @@ const waves = [
   { numEnemies: 5, baseHealth: 100, healthVariance: 30, baseSpeed: 3, speedVariance: 1, spawnRadius: 25, color: 0xff4444, scale: 1 },
   { numEnemies: 7, baseHealth: 120, healthVariance: 40, baseSpeed: 3.5, speedVariance: 1.5, spawnRadius: 30, color: 0xff4444, scale: 1 },
   { numEnemies: 10, baseHealth: 150, healthVariance: 50, baseSpeed: 4, speedVariance: 2, spawnRadius: 35, color: 0xff4444, scale: 1 },
-  { numEnemies: 1, baseHealth: 1000, healthVariance: 0, baseSpeed: 2, speedVariance: 0, spawnRadius: 10, color: 0xaa00ff, scale: 4 }, // BOSS ROUND
+  { numEnemies: 1, baseHealth: 1000, healthVariance: 0, baseSpeed: 2, speedVariance: 0, spawnRadius: 10, color: 0xaa00ff, scale: 4, emissiveColor: 0xff88ff }, // BOSS ROUND
   // Add more waves as desired
 ];
+
+function createEndlessWave(roundNumber) {
+  const bossWave = waves[waves.length - 1];
+  const extra = roundNumber - waves.length;
+  const enemyCount = Math.max(3, bossWave.numEnemies + extra * 2);
+  const baseHealth = bossWave.baseHealth + extra * 120;
+  const healthVariance = bossWave.healthVariance + extra * 20;
+  const baseSpeed = Math.min(8, bossWave.baseSpeed + extra * 0.25);
+  const speedVariance = bossWave.speedVariance + extra * 0.2;
+  const spawnRadius = Math.min(60, bossWave.spawnRadius + extra * 1.8);
+  const scale = Math.min(4, bossWave.scale - 1 + Math.floor(extra / 2) * 0.5);
+
+  return {
+    numEnemies: enemyCount,
+    baseHealth,
+    healthVariance,
+    baseSpeed,
+    speedVariance,
+    spawnRadius,
+    color: 0xff69ff,
+    emissiveColor: 0xff88ff,
+    scale: Math.max(1, scale),
+  };
+}
 
 const roundDisplay = document.createElement('div');
 roundDisplay.id = 'roundDisplay';
@@ -391,14 +455,12 @@ function addShopDecoration() {
 
 function startNextWave() {
   currentRound++;
+  const wave = currentRound <= waves.length ? waves[currentRound - 1] : createEndlessWave(currentRound);
   if (currentRound > waves.length) {
-    console.log("All waves completed! You win!");
-    status.textContent = "You Win! Click to play again.";
-    overlay.style.display = 'block';
-    return;
+    console.log(`Entering endless mode at round ${currentRound}.`);
+    status.textContent = `Endless mode: Round ${currentRound}`;
   }
 
-  const wave = waves[currentRound - 1];
   enemiesRemaining = wave.numEnemies;
   waveActive = true;
   console.log(`Starting Wave ${currentRound} with ${wave.numEnemies} enemies.`);
@@ -406,6 +468,7 @@ function startNextWave() {
   for (let i = 0; i < wave.numEnemies; i++) {
     const health = wave.baseHealth + (Math.random() - 0.5) * 2 * wave.healthVariance;
     const speed = wave.baseSpeed + (Math.random() - 0.5) * 2 * wave.speedVariance;
+    const emissiveColor = wave.emissiveColor || 0x000000;
 
     let spawnX, spawnZ;
     let attempts = 0;
@@ -429,7 +492,7 @@ function startNextWave() {
     );
 
 
-    createEnemy(spawnX, spawnZ, health, speed, wave.color, wave.scale);
+    createEnemy(spawnX, spawnZ, health, speed, wave.color, wave.scale, emissiveColor);
   }
   updateGameUI();
 }
@@ -440,18 +503,55 @@ const projectiles = [];
 const golds = [];
 let goldCount = 0;
 
-const goldMaterial = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x553300, roughness: 0.25, metalness: 1 });
+const goldRingMaterial = new THREE.MeshStandardMaterial({
+  color: 0x7ff8ff,
+  emissive: 0x4ae5ff,
+  emissiveIntensity: 1.8,
+  roughness: 0.06,
+  metalness: 0.92,
+});
+const goldCoreMaterial = new THREE.MeshStandardMaterial({
+  color: 0xe8ffff,
+  emissive: 0x8effff,
+  emissiveIntensity: 2.6,
+  roughness: 0.15,
+  metalness: 0.8,
+  transparent: true,
+  opacity: 0.96,
+});
+const goldGlowMaterial = new THREE.MeshBasicMaterial({
+  color: 0x5ff8ff,
+  transparent: true,
+  opacity: 0.22,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
 
 function createGold(x, z, amount = 1) {
-  const geometry = new THREE.TorusGeometry(0.5, 0.18, 16, 30);
-  const mesh = new THREE.Mesh(geometry, goldMaterial);
-  mesh.position.set(x, 0.8, z);
-  mesh.rotation.x = Math.PI / 2;
-  mesh.userData.amount = amount;
-  mesh.userData.spinSpeed = 1.5 + Math.random() * 1.5;
-  scene.add(mesh);
-  golds.push(mesh);
-  return mesh;
+  const group = new THREE.Group();
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.12, 16, 40), goldRingMaterial);
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.26, 18, 18), goldCoreMaterial);
+  core.position.y = 0;
+  group.add(core);
+
+  const glow = new THREE.Mesh(new THREE.RingGeometry(0.82, 1.18, 48), goldGlowMaterial);
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.y = 0.01;
+  group.add(glow);
+
+  group.position.set(x, 0.8, z);
+  group.userData.amount = amount;
+  group.userData.spinSpeed = 1.5 + Math.random() * 1.5;
+  group.userData.pulseOffset = Math.random() * Math.PI * 2;
+  group.userData.pulseGlow = glow;
+  group.userData.coreMesh = core;
+  scene.add(group);
+  golds.push(group);
+  return group;
 }
 
 addShopDecoration();
@@ -478,12 +578,16 @@ for (const pos of [
   createGold(pos.x, pos.z, 3);
 }
 
-function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1) {
+function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1, emissiveColor = 0x000000) {
   const group = new THREE.Group();
 
   // Body
   const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: color });
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: emissiveColor,
+    emissiveIntensity: emissiveColor !== 0x000000 ? 0.75 : 0,
+  });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
   body.castShadow = true;
   body.receiveShadow = true;
@@ -491,7 +595,11 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1)
 
   // Arms
   const armGeo = new THREE.BoxGeometry(0.25, 0.7, 0.25);
-  const armMat = new THREE.MeshStandardMaterial({ color: color });
+  const armMat = new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: emissiveColor,
+    emissiveIntensity: emissiveColor !== 0x000000 ? 0.55 : 0,
+  });
   const leftArm = new THREE.Mesh(armGeo, armMat);
   leftArm.position.set(-0.65, 0, 0);
   leftArm.castShadow = true;
@@ -556,6 +664,8 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1)
   group.userData.rightArm = rightArm;
   group.userData.leftLeg = leftLeg;
   group.userData.rightLeg = rightLeg;
+  group.userData.emissiveColor = emissiveColor;
+  group.userData.emissiveOrigIntensity = bodyMat.emissiveIntensity || 0;
 
   group.position.set(x, 1.3, z);
   scene.add(group);
@@ -569,18 +679,22 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1)
   return group;
 }
 
-function spawnBossProjectile(sourcePos, color) {
-  const pGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-  const pMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.5 });
+function spawnBossProjectile(sourcePos, color, sizeScale = 1) {
+  const baseSize = 0.6; // base cube size
+  const size = baseSize * Math.max(0.8, sizeScale);
+  const pGeo = new THREE.BoxGeometry(size, size, size);
+  const pMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.6 });
   const projectile = new THREE.Mesh(pGeo, pMat);
-  
+
   projectile.position.copy(sourcePos);
   projectile.position.y += 1.5; // Shoot from chest height
-  
+
   const direction = new THREE.Vector3().subVectors(player.position, projectile.position).normalize();
-  projectile.userData.velocity = direction.multiplyScalar(12); // Projectile speed
-  projectile.userData.life = 4.0; // Seconds before it disappears
-  
+  projectile.userData.velocity = direction.multiplyScalar(10 + 4 * Math.max(0.5, sizeScale)); // Projectile speed scaled
+  projectile.userData.life = 5.0; // Seconds before it disappears
+  projectile.userData.damage = Math.ceil(12 * Math.max(1, sizeScale));
+  projectile.userData.reflected = false;
+
   scene.add(projectile);
   projectiles.push(projectile);
 }
@@ -841,6 +955,27 @@ function animate() {
   player.damageCooldown = Math.max(0, player.damageCooldown - delta);
   const enemiesToKeep = [];
   enemies.forEach((enemy, i) => {
+    // Handle visual flash effect when recently hit by a reflected projectile
+    if (enemy.userData.flashTimer && enemy.userData.flashTimer > 0) {
+      enemy.userData.flashTimer -= delta;
+      const t = Math.max(0, enemy.userData.flashTimer / (enemy.userData.flashDuration || 0.18));
+      const intensity = (enemy.userData.flashIntensity || 2) * t;
+      enemy.traverse((c) => {
+        if (c.isMesh && c.material && 'emissiveIntensity' in c.material) {
+          if (enemy.userData._flashColor) c.material.emissive.setHex(enemy.userData._flashColor);
+          c.material.emissiveIntensity = intensity;
+        }
+      });
+      if (enemy.userData.flashTimer <= 0) {
+        // restore emissive intensity and color
+        enemy.traverse((c) => {
+          if (c.isMesh && c.material && 'emissiveIntensity' in c.material) {
+            c.material.emissiveIntensity = enemy.userData.emissiveOrigIntensity || 0;
+            if (enemy.userData.emissiveColor) c.material.emissive.setHex(enemy.userData.emissiveColor);
+          }
+        });
+      }
+    }
     let isKnockedBack = false;
     // --- Health-based Scaling ---
     const healthRatio = enemy.userData.health / enemy.userData.maxHealth;
@@ -938,7 +1073,7 @@ function animate() {
     if (enemy.userData.baseScale > 1) {
       enemy.userData.shootTimer = (enemy.userData.shootTimer || 0) - delta;
       if (enemy.userData.shootTimer <= 0) {
-        spawnBossProjectile(enemy.position, enemy.userData.color);
+        spawnBossProjectile(enemy.position, enemy.userData.color, enemy.userData.baseScale || 1);
         enemy.userData.shootTimer = 1.5 + Math.random(); // Wait 1.5 to 2.5 seconds
       }
     }
@@ -984,6 +1119,35 @@ function animate() {
     }
     if (hitWall) continue; // Projectile was removed, move to next projectile
 
+    // Check reflected projectiles for enemy hits
+    const enemyProjectileBox = new THREE.Box3().setFromObject(p);
+    let hitEnemy = false;
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const enemy = enemies[j];
+      enemy.updateWorldMatrix(true, true);
+      const enemyBox = new THREE.Box3().setFromObject(enemy);
+      if (enemyProjectileBox.intersectsBox(enemyBox)) {
+        if (p.userData.reflected) {
+          const dmg = p.userData.damage || Math.ceil(player.attackDamage * 1.8);
+          const defeated = damageEnemy(enemy, dmg);
+          if (!defeated) {
+            enemy.userData.flashTimer = 0.18;
+            enemy.userData.flashDuration = 0.18;
+            enemy.userData.flashIntensity = Math.min(5, 2 + (enemy.userData.baseScale || 1));
+            enemy.userData._flashColor = 0xffffff;
+          } else {
+            enemies.splice(j, 1);
+          }
+          createExplosion(p.position, p.material && p.material.color ? p.material.color.getHex() : 0x88ffff);
+        }
+        scene.remove(p);
+        projectiles.splice(i, 1);
+        hitEnemy = true;
+        break;
+      }
+    }
+    if (hitEnemy) continue;
+
     if (p.userData.life <= 0) {
       scene.remove(p);
       projectiles.splice(i, 1);
@@ -996,7 +1160,20 @@ function animate() {
   // Update gold pickups
   for (let i = golds.length - 1; i >= 0; i--) {
     const gold = golds[i];
+    if (!gold || !gold.userData) continue;
     gold.rotation.y += gold.userData.spinSpeed * delta;
+
+    const pulse = gold.userData.pulseGlow;
+    if (pulse) {
+      const pulseValue = 1 + Math.sin(clock.elapsedTime * 2.2 + (gold.userData.pulseOffset || 0)) * 0.08;
+      pulse.scale.setScalar(pulseValue);
+    }
+
+    const core = gold.userData.coreMesh;
+    if (core && core.material && 'emissiveIntensity' in core.material) {
+      core.material.emissiveIntensity = 2.2 + Math.sin(clock.elapsedTime * 2.6 + (gold.userData.pulseOffset || 0)) * 0.2;
+    }
+
     if (gold.position.distanceTo(player.position) < 1.4) {
       collectGold(gold);
     }
@@ -1189,6 +1366,26 @@ function checkAttack() {
       impactDir.normalize();
       enemy.userData.knockbackDir.copy(impactDir);
       enemy.userData.knockbackForce = 0.5; // Intensity of the push
+    }
+  }
+  
+  // Reflect boss projectiles when the player attacks.
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const projectile = projectiles[i];
+    const projectileBox = new THREE.Box3().setFromObject(projectile);
+    if (attackBox.intersectsBox(projectileBox)) {
+      projectile.userData.velocity.copy(direction).multiplyScalar(18);
+      projectile.userData.reflected = true;
+      projectile.userData.life = 3.5;
+      if (projectile.material && projectile.material.emissive) {
+        projectile.material.emissive.setHex(0x88ffff);
+        projectile.material.emissiveIntensity = 0.9;
+      }
+        // Make reflected projectiles larger and more damaging
+        const reflectSizeMul = 1.6;
+        if (projectile.scale) projectile.scale.multiplyScalar(reflectSizeMul);
+        projectile.userData.damage = Math.ceil((projectile.userData.damage || 12) * 1.9);
+        projectile.userData.velocity.multiplyScalar(1.15);
     }
   }
 }
