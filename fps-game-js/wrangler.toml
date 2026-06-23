@@ -1,0 +1,12 @@
+name = "fps-game-js"
+type = "javascript"
+compatibility_date = "2025-01-01"
+
+[site]
+  bucket = "./"
+
+[[d1_databases]]
+
+binding = "DB"
+database_name = "cube_assault-db"
+database_id = "ca60677c-f3d2-4baa-942e-e65318fe53aa"

@@ -16,6 +16,27 @@ document.body.appendChild(renderer.domElement);
 
 const overlay = document.getElementById('overlay');
 const status = document.getElementById('status');
+const restartButton = document.getElementById('restartButton');
+
+restartButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  if (gameOver) {
+    resetGame();
+    overlay.style.display = 'none';
+    restartButton.style.display = 'none';
+    setPointerLock();
+  }
+});
+
+const hpFlashOverlay = document.createElement('div');
+hpFlashOverlay.id = 'hpFlashOverlay';
+document.body.appendChild(hpFlashOverlay);
+
+function triggerHpFlash() {
+  hpFlashOverlay.classList.remove('active');
+  void hpFlashOverlay.offsetWidth;
+  hpFlashOverlay.classList.add('active');
+}
 
 window.addEventListener('error', (event) => {
   status.textContent = `Error: ${event.message}`;
@@ -210,6 +231,12 @@ let enemiesRemaining = 0;
 let score = 0;
 let waveActive = false;
 let waveDelayTimer = 0;
+let gameOver = false;
+let prevRound = -1;
+let prevEnemies = -1;
+let prevScore = -1;
+let prevGold = -1;
+let prevHealth = -1;
 const WAVE_DELAY_SECONDS = 5; // Time between waves
 const ENEMY_MIN_SCALE_FACTOR = 0.5; // Minimum scale factor for enemies based on health
 
@@ -246,45 +273,45 @@ function createEndlessWave(roundNumber) {
   };
 }
 
+const hudPanel = document.createElement('div');
+hudPanel.id = 'hudPanel';
+hudPanel.style.position = 'absolute';
+hudPanel.style.top = '12px';
+hudPanel.style.left = '12px';
+hudPanel.style.zIndex = '10';
+hudPanel.style.display = 'grid';
+hudPanel.style.gap = '10px';
+hudPanel.style.padding = '16px';
+hudPanel.style.background = 'rgba(6, 6, 25, 0.92)';
+hudPanel.style.border = '1px solid rgba(68, 212, 255, 0.35)';
+hudPanel.style.borderRadius = '18px';
+hudPanel.style.backdropFilter = 'blur(12px)';
+hudPanel.style.boxShadow = '0 0 30px rgba(68, 212, 255, 0.16)';
+document.body.appendChild(hudPanel);
+
 const roundDisplay = document.createElement('div');
 roundDisplay.id = 'roundDisplay';
-roundDisplay.style.position = 'absolute';
-roundDisplay.style.top = '10px';
-roundDisplay.style.left = '10px';
-roundDisplay.style.color = 'white';
-roundDisplay.style.fontFamily = 'monospace';
-roundDisplay.style.fontSize = '18px';
+roundDisplay.className = 'hud-item';
 document.body.appendChild(roundDisplay);
+hudPanel.appendChild(roundDisplay);
 
 const enemiesDisplay = document.createElement('div');
 enemiesDisplay.id = 'enemiesDisplay';
-enemiesDisplay.style.position = 'absolute';
-enemiesDisplay.style.top = '35px';
-enemiesDisplay.style.left = '10px';
-enemiesDisplay.style.color = 'white';
-enemiesDisplay.style.fontFamily = 'monospace';
-enemiesDisplay.style.fontSize = '18px';
+enemiesDisplay.className = 'hud-item';
 document.body.appendChild(enemiesDisplay);
+hudPanel.appendChild(enemiesDisplay);
 
 const scoreDisplay = document.createElement('div');
 scoreDisplay.id = 'scoreDisplay';
-scoreDisplay.style.position = 'absolute';
-scoreDisplay.style.top = '60px';
-scoreDisplay.style.left = '10px';
-scoreDisplay.style.color = 'white';
-scoreDisplay.style.fontFamily = 'monospace';
-scoreDisplay.style.fontSize = '18px';
+scoreDisplay.className = 'hud-item';
 document.body.appendChild(scoreDisplay);
+hudPanel.appendChild(scoreDisplay);
 
 const goldDisplay = document.createElement('div');
 goldDisplay.id = 'goldDisplay';
-goldDisplay.style.position = 'absolute';
-goldDisplay.style.top = '110px';
-goldDisplay.style.left = '10px';
-goldDisplay.style.color = 'white';
-goldDisplay.style.fontFamily = 'monospace';
-goldDisplay.style.fontSize = '18px';
+goldDisplay.className = 'hud-item';
 document.body.appendChild(goldDisplay);
+hudPanel.appendChild(goldDisplay);
 
 const shopPromptDisplay = document.createElement('div');
 shopPromptDisplay.id = 'shopPromptDisplay';
@@ -299,21 +326,50 @@ document.body.appendChild(shopPromptDisplay);
 
 const playerHealthDisplay = document.createElement('div');
 playerHealthDisplay.id = 'playerHealthDisplay';
-playerHealthDisplay.style.position = 'absolute';
-playerHealthDisplay.style.top = '185px';
-playerHealthDisplay.style.left = '10px';
-playerHealthDisplay.style.color = 'white';
-playerHealthDisplay.style.fontFamily = 'monospace';
-playerHealthDisplay.style.fontSize = '18px';
+playerHealthDisplay.className = 'hud-item player-health';
 document.body.appendChild(playerHealthDisplay);
+hudPanel.appendChild(playerHealthDisplay);
 
+function animateHudChange(element, effectClass = 'pulse') {
+  element.classList.remove(effectClass);
+  void element.offsetWidth;
+  element.classList.add(effectClass);
+  window.setTimeout(() => element.classList.remove(effectClass), 500);
+}
 
 function updateGameUI() {
+  if (currentRound !== prevRound) {
+    animateHudChange(roundDisplay);
+    prevRound = currentRound;
+  }
+  if (enemiesRemaining !== prevEnemies) {
+    animateHudChange(enemiesDisplay);
+    prevEnemies = enemiesRemaining;
+  }
+  if (score !== prevScore) {
+    animateHudChange(scoreDisplay);
+    prevScore = score;
+  }
+  if (goldCount !== prevGold) {
+    animateHudChange(goldDisplay, 'gold-pulse');
+    prevGold = goldCount;
+  }
+
+  const currentHealth = Math.max(0, Math.min(player.maxHealth, player.health));
+  if (currentHealth !== prevHealth) {
+    animateHudChange(playerHealthDisplay);
+    prevHealth = currentHealth;
+  }
+
   roundDisplay.textContent = `Round: ${currentRound}`;
   enemiesDisplay.textContent = `Enemies: ${enemiesRemaining}`;
   scoreDisplay.textContent = `Score: ${score}`;
   goldDisplay.textContent = `Gold: ${goldCount}`;
-  playerHealthDisplay.textContent = `Health: ${player.health}/${player.maxHealth}`;
+  playerHealthDisplay.textContent = `HP: ${player.health}/${player.maxHealth}`;
+  const healthPercent = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
+  playerHealthDisplay.style.setProperty('--hp-percent', `${healthPercent}%`);
+  playerHealthDisplay.classList.toggle('danger', healthPercent <= 25);
+  document.body.classList.toggle('critical-hp', healthPercent <= 25);
 }
 
 const shopState = {
@@ -446,7 +502,7 @@ function addShopDecoration() {
 
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(0.7, 0.18, 16, 30),
-    goldMaterial
+    goldRingMaterial
   );
   ring.position.set(shopState.position.x, 2.8, shopState.position.z);
   ring.rotation.x = Math.PI / 2;
@@ -563,6 +619,7 @@ function collectGold(gold) {
   const index = golds.indexOf(gold);
   if (index !== -1) golds.splice(index, 1);
   updateGameUI();
+  animateHudChange(goldDisplay, 'gold-pulse');
 }
 
 for (const pos of [
@@ -685,12 +742,15 @@ function spawnBossProjectile(sourcePos, color, sizeScale = 1) {
   const pGeo = new THREE.BoxGeometry(size, size, size);
   const pMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.6 });
   const projectile = new THREE.Mesh(pGeo, pMat);
-
   projectile.position.copy(sourcePos);
   projectile.position.y += 1.5; // Shoot from chest height
 
-  const direction = new THREE.Vector3().subVectors(player.position, projectile.position).normalize();
-  projectile.userData.velocity = direction.multiplyScalar(10 + 4 * Math.max(0.5, sizeScale)); // Projectile speed scaled
+  // Calculate a unit direction toward the player and spawn the projectile
+  // slightly in front of the boss to avoid immediate collision with its owner.
+  const unitDir = new THREE.Vector3().subVectors(player.position, projectile.position).normalize();
+  projectile.userData.velocity = unitDir.clone().multiplyScalar(10 + 4 * Math.max(0.5, sizeScale)); // Projectile speed scaled
+  const spawnOffset = Math.max(0.6, size * 0.8) + 0.4; // meters forward to clear the boss hitbox
+  projectile.position.addScaledVector(unitDir, spawnOffset);
   projectile.userData.life = 5.0; // Seconds before it disappears
   projectile.userData.damage = Math.ceil(12 * Math.max(1, sizeScale));
   projectile.userData.reflected = false;
@@ -745,11 +805,16 @@ function checkEnemyCollisionAtPosition(x, y, z, scale) {
 function damagePlayer(amount) {
   player.health -= amount;
   if (player.health < 0) player.health = 0;
+  if (player.health <= Math.max(25, player.maxHealth * 0.25)) {
+    triggerHpFlash();
+  }
   updateGameUI();
   
   if (player.health <= 0) {
-    status.textContent = "GAME OVER! Click to try again.";
+    gameOver = true;
+    status.textContent = "GAME OVER! Click Restart Game.";
     overlay.style.display = 'block';
+    restartButton.style.display = 'inline-block';
     if (document.pointerLockElement === renderer.domElement) {
       document.exitPointerLock();
     }
@@ -757,6 +822,8 @@ function damagePlayer(amount) {
 }
 
 function resetGame() {
+  gameOver = false;
+  restartButton.style.display = 'none';
   // Clear enemies from scene and array
   enemies.forEach(enemy => {
     scene.remove(enemy);
@@ -1410,10 +1477,7 @@ renderer.domElement.addEventListener('click', () => {
 
 overlay.addEventListener('click', (event) => {
   event.stopPropagation();
-  if (!player.mouseLocked) {
-    if (player.health <= 0 || currentRound > waves.length) {
-      resetGame();
-    }
+  if (!player.mouseLocked && !gameOver) {
     overlay.style.display = 'none';
     setPointerLock();
   }

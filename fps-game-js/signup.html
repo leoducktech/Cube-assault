@@ -38,26 +38,69 @@
             </div>
           </div>
 
-          <form class="space-y-5 rounded-[1.75rem] border border-amber-400/10 bg-black/60 p-6 shadow-[inset_0_0_60px_rgba(251,191,36,0.08)]">
+          <form id="signup-form" class="space-y-5 rounded-[1.75rem] border border-amber-400/10 bg-black/60 p-6 shadow-[inset_0_0_60px_rgba(251,191,36,0.08)]">
             <div>
               <label class="block text-sm font-semibold uppercase tracking-[0.18em] text-amber-300">Username</label>
-              <input type="text" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Choose a username" required>
+              <input name="username" type="text" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Choose a username" required>
             </div>
             <div>
               <label class="block text-sm font-semibold uppercase tracking-[0.18em] text-amber-300">Email</label>
-              <input type="email" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Enter your email address" required>
+              <input name="email" type="email" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Enter your email address" required>
             </div>
             <div>
               <label class="block text-sm font-semibold uppercase tracking-[0.18em] text-amber-300">Password</label>
-              <input type="password" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Create a password" required>
+              <input name="password" type="password" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Create a password" required>
             </div>
             <div>
               <label class="block text-sm font-semibold uppercase tracking-[0.18em] text-amber-300">Confirm Password</label>
-              <input type="password" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Repeat your password" required>
+              <input name="confirmPassword" type="password" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Repeat your password" required>
             </div>
             <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] text-slate-950 shadow-xl shadow-amber-500/20 transition hover:bg-amber-400">Create Account</button>
-            <div class="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-center text-xs text-amber-200">By signing up, you agree to join the Cube Assault battle network.</div>
+            <div id="signup-message" class="mt-4 text-sm text-amber-200"></div>
+            <div class="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-center text-xs text-amber-200">By signing up, you agree to join the Cube Assault battle network.</div>
           </form>
+          <script>
+            const signupForm = document.getElementById('signup-form');
+            const signupMessage = document.getElementById('signup-message');
+
+            signupForm.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              signupMessage.textContent = '';
+              signupMessage.className = 'mt-4 text-sm text-amber-200';
+
+              const formData = new FormData(signupForm);
+              const payload = {
+                username: formData.get('username'),
+                email: formData.get('email'),
+                password: formData.get('password'),
+                confirmPassword: formData.get('confirmPassword'),
+              };
+
+              const apiUrl = '/api/signup';
+
+              try {
+                const response = await fetch(apiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                  signupMessage.textContent = result.error || 'Unable to create your account.';
+                  signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                  return;
+                }
+
+                signupMessage.textContent = result.message || 'Account created. Redirecting to login...';
+                signupMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
+                setTimeout(() => window.location.href = 'login.html', 1300);
+              } catch (error) {
+                signupMessage.textContent = 'Network error. Please try again.';
+                signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+              }
+            });
+          </script>
         </div>
 
         <div class="mt-8 flex flex-col gap-3 text-sm text-amber-200/80 sm:flex-row sm:items-center sm:justify-between">
