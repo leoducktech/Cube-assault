@@ -902,7 +902,7 @@ let playerModel = null;
 let attackAction = null;
 let idleAction = null;
 
-const modelPath = encodeURI('knife_animated (1).glb');
+const modelPath = encodeURI('knife_animated.glb');
 gltfLoader.load(
   modelPath,
   (gltf) => {
