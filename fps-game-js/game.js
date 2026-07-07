@@ -250,15 +250,13 @@ const waves = [
 ];
 
 function createEndlessWave(roundNumber) {
-  const bossWave = waves[waves.length - 1];
   const extra = roundNumber - waves.length;
-  const enemyCount = Math.max(3, bossWave.numEnemies + extra * 2);
-  const baseHealth = bossWave.baseHealth + extra * 120;
-  const healthVariance = bossWave.healthVariance + extra * 20;
-  const baseSpeed = Math.min(8, bossWave.baseSpeed + extra * 0.25);
-  const speedVariance = bossWave.speedVariance + extra * 0.2;
-  const spawnRadius = Math.min(60, bossWave.spawnRadius + extra * 1.8);
-  const scale = Math.min(4, bossWave.scale - 1 + Math.floor(extra / 2) * 0.5);
+  const enemyCount = Math.max(3, 3 + extra * 2);
+  const baseHealth = 80 + extra * 45;
+  const healthVariance = 20 + extra * 12;
+  const baseSpeed = 2.5 + extra * 0.35;
+  const speedVariance = 0.5 + extra * 0.2;
+  const spawnRadius = 20 + extra * 3.5;
 
   return {
     numEnemies: enemyCount,
@@ -267,9 +265,8 @@ function createEndlessWave(roundNumber) {
     baseSpeed,
     speedVariance,
     spawnRadius,
-    color: 0xff69ff,
-    emissiveColor: 0xff88ff,
-    scale: Math.max(1, scale),
+    color: 0xff4444,
+    scale: 1,
   };
 }
 
@@ -635,6 +632,49 @@ for (const pos of [
   createGold(pos.x, pos.z, 3);
 }
 
+function createEnemyScars(enemy) {
+  const scarMeshes = [];
+  const scarPositions = [
+    { x: 0.16, y: 0.06, z: 0.51, rotX: 0, rotY: 0, rotZ: 0.65 },
+    { x: -0.14, y: 0.08, z: 0.51, rotX: 0, rotY: 0, rotZ: -0.4 },
+    { x: 0.42, y: -0.02, z: 0.28, rotX: 0, rotY: 1.1, rotZ: 0 },
+    { x: -0.38, y: -0.08, z: 0.24, rotX: 0, rotY: -1.0, rotZ: 0 },
+    { x: 0.12, y: -0.55, z: 0.22, rotX: 0.7, rotY: 0, rotZ: 0.15 },
+  ];
+
+  scarPositions.forEach((entry) => {
+    const scarGeom = new THREE.BoxGeometry(0.18, 0.04, 0.01);
+    const scarMat = new THREE.MeshBasicMaterial({
+      color: 0x5a2a2a,
+      transparent: true,
+      opacity: 0.18,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const scar = new THREE.Mesh(scarGeom, scarMat);
+    scar.position.set(entry.x, entry.y, entry.z);
+    scar.rotation.set(entry.rotX, entry.rotY, entry.rotZ);
+    enemy.add(scar);
+    scarMeshes.push(scar);
+  });
+
+  enemy.userData.scarMeshes = scarMeshes;
+}
+
+function updateEnemyScars(enemy) {
+  if (!enemy?.userData?.scarMeshes?.length) return;
+
+  const healthRatio = Math.max(0, Math.min(1, enemy.userData.health / enemy.userData.maxHealth));
+  const damageLevel = 1 - healthRatio;
+  const opacity = 0.16 + damageLevel * 0.72;
+
+  enemy.userData.scarMeshes.forEach((scar) => {
+    if (scar.material) {
+      scar.material.opacity = opacity;
+    }
+  });
+}
+
 function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1, emissiveColor = 0x000000) {
   const group = new THREE.Group();
 
@@ -695,7 +735,8 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   // Health Bar
   const healthBarGroup = new THREE.Group();
   healthBarGroup.position.set(0, 1, 0); // Position above the body
-  group.add(healthBarGroup);
+  scene.add(healthBarGroup);
+  healthBarGroup.userData.owner = group;
 
   const hbBgGeo = new THREE.PlaneGeometry(1, 0.15);
   const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
@@ -723,6 +764,9 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   group.userData.rightLeg = rightLeg;
   group.userData.emissiveColor = emissiveColor;
   group.userData.emissiveOrigIntensity = bodyMat.emissiveIntensity || 0;
+
+  createEnemyScars(group);
+  updateEnemyScars(group);
 
   group.position.set(x, 1.3, z);
   scene.add(group);
@@ -759,13 +803,27 @@ function spawnBossProjectile(sourcePos, color, sizeScale = 1) {
   projectiles.push(projectile);
 }
 
+function updateEnemyHealthBar(enemy) {
+  if (!enemy?.userData?.healthBar) return;
+
+  const healthRatio = Math.max(0, Math.min(1, enemy.userData.health / enemy.userData.maxHealth));
+  enemy.userData.healthBar.scale.x = healthRatio;
+  updateEnemyScars(enemy);
+
+  const enemyScale = Math.max(0.0001, enemy.scale?.x || 1);
+  if (enemy.userData.healthBarContainer) {
+    enemy.userData.healthBarContainer.scale.set(1 / enemyScale, 1 / enemyScale, 1 / enemyScale);
+    enemy.userData.healthBarContainer.position.set(
+      enemy.position.x,
+      enemy.position.y + 1.4 + (enemy.userData.baseScale || 1) * 0.1,
+      enemy.position.z
+    );
+  }
+}
+
 function damageEnemy(enemy, amount) {
   enemy.userData.health -= amount;
-  const healthRatio = Math.max(0, enemy.userData.health / enemy.userData.maxHealth);
-  
-  if (enemy.userData.healthBar) {
-    enemy.userData.healthBar.scale.x = healthRatio;
-  }
+  updateEnemyHealthBar(enemy);
 
   if (enemy.userData.health <= 0) {
     createExplosion(enemy.position, enemy.userData.color);
@@ -777,6 +835,7 @@ function damageEnemy(enemy, amount) {
     }
     scene.remove(enemy);
     if (enemy.userData.helper) scene.remove(enemy.userData.helper);
+    if (enemy.userData.healthBarContainer) scene.remove(enemy.userData.healthBarContainer);
     
     score += 100;
     enemiesRemaining--;
@@ -964,11 +1023,11 @@ function checkEnemyCollision(enemy) {
 }
 
 function collide(position) {
-  const radius = 0.55;
-  const height = 1.8;
+  const radius = 0.5;
+  const halfHeight = 0.8;
   const playerBox = new THREE.Box3(
-    new THREE.Vector3(position.x - radius, position.y - 0.9, position.z - radius),
-    new THREE.Vector3(position.x + radius, position.y + 0.9, position.z + radius)
+    new THREE.Vector3(position.x - radius, position.y - halfHeight, position.z - radius),
+    new THREE.Vector3(position.x + radius, position.y + halfHeight, position.z + radius)
   );
   for (const wall of walls) {
     const box = new THREE.Box3().setFromObject(wall);
@@ -977,6 +1036,26 @@ function collide(position) {
     }
   }
   return false;
+}
+
+function movePlayerWithCollision(targetPosition) {
+  const delta = targetPosition.clone().sub(player.position);
+  if (delta.lengthSq() <= 1e-8) return;
+
+  const steps = Math.max(1, Math.ceil(delta.length() / 0.35));
+  const step = delta.divideScalar(steps);
+  let safePosition = player.position.clone();
+
+  for (let i = 0; i < steps; i++) {
+    const candidate = safePosition.clone().add(step);
+    if (!collide(candidate)) {
+      safePosition.copy(candidate);
+    } else {
+      break;
+    }
+  }
+
+  player.position.copy(safePosition);
 }
 
 function checkGround() {
@@ -1049,6 +1128,7 @@ function animate() {
     const baseScale = enemy.userData.baseScale || 1;
     const currentScale = Math.max(ENEMY_MIN_SCALE_FACTOR * baseScale, baseScale * (0.5 + healthRatio * 0.5)); // Don't let them get TOO small
     enemy.scale.set(currentScale, currentScale, currentScale);
+    updateEnemyHealthBar(enemy);
 
     const speed = enemy.userData.speed;
     const direction = new THREE.Vector3().subVectors(player.position, enemy.position);
@@ -1148,8 +1228,11 @@ function animate() {
     // Update the visual helper as the enemy moves
     if (enemy.userData.helper) enemy.userData.helper.update();
 
-    // Billboard the health bar (make it face the camera)
-    if (enemy.userData.healthBarContainer) enemy.userData.healthBarContainer.quaternion.copy(camera.quaternion);
+    // Billboard the health bar (make it face the camera) and keep it anchored to the enemy
+    if (enemy.userData.healthBarContainer) {
+      enemy.userData.healthBarContainer.quaternion.copy(camera.quaternion);
+      updateEnemyHealthBar(enemy);
+    }
 
     // If not defeated by wall damage, keep the enemy
     if (!defeatedByWall) {
@@ -1288,25 +1371,14 @@ function animate() {
 
   player.velocity.y -= 20 * delta;
   const nextPosition = player.position.clone().addScaledVector(player.velocity, delta);
+  movePlayerWithCollision(nextPosition);
 
-  const horizontalX = new THREE.Vector3(nextPosition.x, player.position.y, player.position.z);
-  if (!collide(horizontalX)) {
-    player.position.x = nextPosition.x;
-  } else {
+  if (player.position.x === nextPosition.x && player.position.z === nextPosition.z) {
     player.velocity.x = 0;
-  }
-
-  const horizontalZ = new THREE.Vector3(player.position.x, player.position.y, nextPosition.z);
-  if (!collide(horizontalZ)) {
-    player.position.z = nextPosition.z;
-  } else {
     player.velocity.z = 0;
   }
 
-  const verticalPos = new THREE.Vector3(player.position.x, nextPosition.y, player.position.z);
-  if (!collide(verticalPos)) {
-    player.position.y = nextPosition.y;
-  } else {
+  if (player.position.y === nextPosition.y) {
     if (player.velocity.y > 0) {
       player.velocity.y = 0;
     }

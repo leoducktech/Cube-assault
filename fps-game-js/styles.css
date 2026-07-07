@@ -12,18 +12,19 @@ html, body {
   color: #d3f8ff;
 }
 body {
-  cursor: crosshair;
+  cursor: none;
 }
 body::before {
   content: '';
   position: fixed;
   left: 50%;
   top: 50%;
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(245, 228, 203, 0.85);
+  border: 1.5px solid rgba(98, 225, 255, 0.95);
   border-radius: 50%;
+  box-shadow: 0 0 14px rgba(98, 225, 255, 0.3), inset 0 0 8px rgba(98, 225, 255, 0.16);
   pointer-events: none;
   mix-blend-mode: screen;
 }
@@ -32,12 +33,17 @@ body::after {
   position: fixed;
   left: 50%;
   top: 50%;
-  width: 4px;
-  height: 4px;
+  width: 7px;
+  height: 7px;
   transform: translate(-50%, -50%);
-  background: #fff6d8;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(98, 225, 255, 0.8) 45%, rgba(98, 225, 255, 0) 70%);
   border-radius: 50%;
   pointer-events: none;
+  box-shadow: 0 0 10px rgba(98, 225, 255, 0.55);
+}
+body::before,
+body::after {
+  z-index: 9999;
 }
 #overlay {
   position: absolute;
