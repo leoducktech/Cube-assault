@@ -11,6 +11,10 @@
     "type": "git",
     "url": "git+https://github.com/leoducktech/Cube-assault.git"
   },
+  "devDependencies": {
+    "wrangler":"^4.25.0",
+    "concurrently":"^9.2.1"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

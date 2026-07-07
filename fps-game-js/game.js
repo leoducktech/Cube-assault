@@ -1038,25 +1038,7 @@ function collide(position) {
   return false;
 }
 
-function movePlayerWithCollision(targetPosition) {
-  const delta = targetPosition.clone().sub(player.position);
-  if (delta.lengthSq() <= 1e-8) return;
 
-  const steps = Math.max(1, Math.ceil(delta.length() / 0.35));
-  const step = delta.divideScalar(steps);
-  let safePosition = player.position.clone();
-
-  for (let i = 0; i < steps; i++) {
-    const candidate = safePosition.clone().add(step);
-    if (!collide(candidate)) {
-      safePosition.copy(candidate);
-    } else {
-      break;
-    }
-  }
-
-  player.position.copy(safePosition);
-}
 
 function checkGround() {
   const down = player.position.clone();
@@ -1066,6 +1048,43 @@ function checkGround() {
     const box = new THREE.Box3().setFromObject(wall);
     return box.containsPoint(down);
   });
+}
+
+function findAvoidanceDirection(enemyPos, targetDir, searchAngles = 8) {
+  const testDir = targetDir.clone().normalize();
+  const right = new THREE.Vector3(-testDir.z, 0, testDir.x).normalize();
+
+  const testPositions = [
+    { pos: enemyPos.clone().addScaledVector(testDir, 0.8), weight: 10 },
+    { pos: enemyPos.clone().addScaledVector(right, 0.6), weight: 4 },
+    { pos: enemyPos.clone().addScaledVector(right, -0.6), weight: 4 },
+  ];
+
+  for (let angle = 45; angle <= 360; angle += 45) {
+    const rad = (angle * Math.PI) / 180;
+    const rotDir = new THREE.Vector3(
+      testDir.x * Math.cos(rad) - testDir.z * Math.sin(rad),
+      0,
+      testDir.x * Math.sin(rad) + testDir.z * Math.cos(rad)
+    ).normalize();
+    testPositions.push({ pos: enemyPos.clone().addScaledVector(rotDir, 0.8), weight: Math.max(1, 10 - Math.abs(angle - 180) / 20) });
+  }
+
+  let bestDir = testDir.clone();
+  let bestWeight = 0;
+
+  for (const test of testPositions) {
+    if (!collide(test.pos)) {
+      const distToTarget = test.pos.distanceTo(player.position);
+      const weight = test.weight - distToTarget * 0.05;
+      if (weight > bestWeight) {
+        bestWeight = weight;
+        bestDir = new THREE.Vector3().subVectors(test.pos, enemyPos).normalize();
+      }
+    }
+  }
+
+  return bestDir;
 }
 
 function clamp(value, min, max) {
@@ -1160,7 +1179,14 @@ function animate() {
       enemy.userData.leftLeg.rotation.x = 0;
       enemy.userData.rightLeg.rotation.x = 0;
     } else if (direction.length() > 1.5 * currentScale) { // Stop moving when close to the player, adjusted for scale
-      const moveDir = direction.normalize().add(separation.multiplyScalar(0.8)).normalize();
+      let moveDir = direction.normalize().add(separation.multiplyScalar(0.8)).normalize();
+      
+      // Check if direct path is blocked; if so, use pathfinding
+      const testPos = enemy.position.clone().addScaledVector(moveDir, speed * delta * 1.2);
+      if (collide(testPos)) {
+        moveDir = findAvoidanceDirection(enemy.position, direction);
+      }
+      
       movement.addScaledVector(moveDir, speed * delta);
       enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
 
@@ -1371,14 +1397,25 @@ function animate() {
 
   player.velocity.y -= 20 * delta;
   const nextPosition = player.position.clone().addScaledVector(player.velocity, delta);
-  movePlayerWithCollision(nextPosition);
 
-  if (player.position.x === nextPosition.x && player.position.z === nextPosition.z) {
+  const horizontalX = new THREE.Vector3(nextPosition.x, player.position.y, player.position.z);
+  if (!collide(horizontalX)) {
+    player.position.x = nextPosition.x;
+  } else {
     player.velocity.x = 0;
+  }
+
+  const horizontalZ = new THREE.Vector3(player.position.x, player.position.y, nextPosition.z);
+  if (!collide(horizontalZ)) {
+    player.position.z = nextPosition.z;
+  } else {
     player.velocity.z = 0;
   }
 
-  if (player.position.y === nextPosition.y) {
+  const verticalPos = new THREE.Vector3(player.position.x, nextPosition.y, player.position.z);
+  if (!collide(verticalPos)) {
+    player.position.y = nextPosition.y;
+  } else {
     if (player.velocity.y > 0) {
       player.velocity.y = 0;
     }

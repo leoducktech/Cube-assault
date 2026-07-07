@@ -31,7 +31,7 @@ export async function onRequestPost(context) {
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE,
       email TEXT UNIQUE,
-      password_hash TEXT,
+      password TEXT,
       created_at TEXT
     )`
   ).run();
@@ -51,7 +51,7 @@ export async function onRequestPost(context) {
   const createdAt = new Date().toISOString();
 
   await env.DB.prepare(
-    'INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO users (id, username, email, password, created_at) VALUES (?, ?, ?, ?, ?)'
   )
     .bind(userId, username, email, passwordHash, createdAt)
     .run();
