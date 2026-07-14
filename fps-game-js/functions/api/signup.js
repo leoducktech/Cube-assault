@@ -26,18 +26,8 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, error: 'Passwords do not match.' }, 400);
   }
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      username TEXT UNIQUE,
-      email TEXT UNIQUE,
-      password TEXT,
-      created_at TEXT
-    )`
-  ).run();
-
   const existing = await env.DB.prepare(
-    'SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1'
+    'SELECT username FROM users WHERE username = ? OR email = ? LIMIT 1'
   )
     .bind(username, email)
     .first();
@@ -46,14 +36,12 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, error: 'Username or email already in use.' }, 409);
   }
 
-  const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(password);
-  const createdAt = new Date().toISOString();
 
   await env.DB.prepare(
-    'INSERT INTO users (id, username, email, password, created_at) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO users (username, email, password) VALUES (?, ?, ?)'
   )
-    .bind(userId, username, email, passwordHash, createdAt)
+    .bind(username, email, passwordHash)
     .run();
 
   return jsonResponse({ success: true, message: 'Account created successfully.' }, 201);

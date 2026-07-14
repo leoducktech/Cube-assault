@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cube Assault - FPS Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top, #1a0f35 0%, #050113 38%, #000000 100%);
+      color: #d3f8ff;
+      overflow-x: hidden;
+    }
+    .stars {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .star {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      background: #fff;
+      border-radius: 50%;
+      opacity: 0.6;
+      animation: twinkle 3s infinite;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+    }
+    .glow-grid {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image:
+        linear-gradient(0deg, transparent 24%, rgba(98, 225, 255, 0.05) 25%, rgba(98, 225, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(98, 225, 255, 0.05) 75%, rgba(98, 225, 255, 0.05) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(98, 225, 255, 0.05) 25%, rgba(98, 225, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(98, 225, 255, 0.05) 75%, rgba(98, 225, 255, 0.05) 76%, transparent 77%, transparent);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    .title {
+      font-size: 4rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      background: linear-gradient(135deg, #62e1ff 0%, #a78bfa 50%, #ff88ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 30px rgba(98, 225, 255, 0.4);
+      margin-bottom: 16px;
+      animation: glow-pulse 3s ease-in-out infinite;
+    }
+    @keyframes glow-pulse {
+      0%, 100% { filter: drop-shadow(0 0 8px rgba(98, 225, 255, 0.4)); }
+      50% { filter: drop-shadow(0 0 20px rgba(98, 225, 255, 0.7)); }
+    }
+    .subtitle {
+      font-size: 1.5rem;
+      color: #86d5ff;
+      letter-spacing: 0.08em;
+      font-weight: 300;
+      margin-bottom: 8px;
+      opacity: 0.9;
+    }
+    .tagline {
+      font-size: 1rem;
+      color: #a0d8ff;
+      opacity: 0.7;
+      font-style: italic;
+      margin-bottom: 40px;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    .btn {
+      padding: 16px 40px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: 2px solid;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(8px);
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+      min-width: 200px;
+    }
+    .btn-play {
+      border-color: #62e1ff;
+      background: rgba(98, 225, 255, 0.15);
+      color: #62e1ff;
+      box-shadow: 0 0 20px rgba(98, 225, 255, 0.2), inset 0 0 10px rgba(98, 225, 255, 0.1);
+    }
+    .btn-play:hover {
+      background: rgba(98, 225, 255, 0.25);
+      box-shadow: 0 0 30px rgba(98, 225, 255, 0.4), inset 0 0 15px rgba(98, 225, 255, 0.2);
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      border-color: #a78bfa;
+      background: rgba(167, 139, 250, 0.12);
+      color: #c4b5fd;
+      box-shadow: 0 0 15px rgba(167, 139, 250, 0.15);
+    }
+    .btn-secondary:hover {
+      background: rgba(167, 139, 250, 0.2);
+      box-shadow: 0 0 25px rgba(167, 139, 250, 0.3);
+      transform: translateY(-2px);
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 1000px;
+      margin-top: 80px;
+    }
+    .info-card {
+      padding: 24px;
+      border: 1px solid rgba(98, 225, 255, 0.25);
+      border-radius: 16px;
+      background: rgba(10, 14, 40, 0.6);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 20px rgba(98, 225, 255, 0.1), inset 0 0 1px rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
+    }
+    .info-card:hover {
+      border-color: rgba(98, 225, 255, 0.5);
+      background: rgba(10, 14, 40, 0.8);
+      box-shadow: 0 0 30px rgba(98, 225, 255, 0.2), inset 0 0 1px rgba(255, 255, 255, 0.1);
+      transform: translateY(-4px);
+    }
+    .info-card h3 {
+      font-size: 1.3rem;
+      color: #62e1ff;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .info-card p {
+      color: #a0d8ff;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+    .footer {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.85rem;
+      color: #668ad8;
+      text-align: center;
+      z-index: 2;
+    }
+    @media (max-width: 768px) {
+      .title {
+        font-size: 2.5rem;
+      }
+      .subtitle {
+        font-size: 1.2rem;
+      }
+      .action-buttons {
+        flex-direction: column;
+        gap: 14px;
+      }
+      .btn {
+        min-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-grid"></div>
+  <div class="stars" id="starfield"></div>
+  
+  <div class="container">
+    <div class="header">
+      <div class="title">⚔️ CUBE ASSAULT</div>
+      <div class="subtitle">Survive the Digital Arena</div>
+      <div class="tagline">An intense FPS battle against waves of procedurally-spawned enemies</div>
+    </div>
+
+    <div class="action-buttons">
+      <a href="/index.html" class="btn btn-play">▶ PLAY NOW</a>
+      <a href="/login.html" class="btn btn-secondary">LOG IN</a>
+      <a href="/signup.html" class="btn btn-secondary">SIGN UP</a>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>🎮 GAMEPLAY</h3>
+        <p>Defend your position against endless waves of cube enemies. Collect gold, upgrade your abilities, and survive as long as you can.</p>
+      </div>
+      <div class="info-card">
+        <h3>⚡ FEATURES</h3>
+        <p>Dynamic combat with melee attacks, enemy pathfinding AI, health management, a shop system, and intense boss encounters.</p>
+      </div>
+      <div class="info-card">
+        <h3>🏆 PROGRESSION</h3>
+        <p>Earn points and gold through combat. Face increasingly challenging waves and see how far you can survive.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>© 2026 Cube Assault. Built with Three.js and Cloudflare Workers.</p>
+  </div>
+
+  <script>
+    // Generate random stars
+    const starfield = document.getElementById('starfield');
+    for (let i = 0; i < 80; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.left = Math.random() * 100 + '%';
+      star.style.top = Math.random() * 100 + '%';
+      star.style.animationDelay = Math.random() * 3 + 's';
+      starfield.appendChild(star);
+    }
+  </script>
+</body>
+</html>
