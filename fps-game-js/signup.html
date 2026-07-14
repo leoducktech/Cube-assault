@@ -152,9 +152,13 @@
                   return;
                 }
 
-                signupMessage.textContent = result.message || 'Account created. Redirecting to login...';
+                signupMessage.textContent = result.message || 'Account created. Redirecting to your account...';
                 signupMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
-                setTimeout(() => window.location.href = 'login.html', 1300);
+                localStorage.setItem('cube_assault_account', JSON.stringify({
+                  username: payload.username,
+                  email: payload.email,
+                }));
+                setTimeout(() => window.location.href = 'account.html', 1000);
               } catch (error) {
                 signupMessage.textContent = 'Network error. Please try again.';
                 signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
@@ -164,7 +168,10 @@
         </div>
 
         <div class="mt-8 flex flex-col gap-3 text-sm text-amber-200/80 sm:flex-row sm:items-center sm:justify-between">
-          <a href="login.html" class="text-amber-300 transition hover:text-amber-100">Already have an account? Log in</a>
+          <div class="space-x-4 text-center sm:text-left">
+            <a href="home.html" class="text-amber-300 transition hover:text-amber-100">Back home</a>
+            <a href="login.html" class="text-amber-300 transition hover:text-amber-100">Already have an account? Log in</a>
+          </div>
           <span class="inline-flex rounded-full border border-amber-400/15 bg-amber-400/5 px-3 py-1 uppercase tracking-[0.2em] text-amber-200">Ready for deployment</span>
         </div>
       </div>

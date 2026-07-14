@@ -16,17 +16,79 @@ document.body.appendChild(renderer.domElement);
 
 const overlay = document.getElementById('overlay');
 const status = document.getElementById('status');
+const overlayIntro = document.getElementById('overlayIntro');
+const instructions = document.getElementById('instructions');
+const gameOverPanel = document.getElementById('gameOverPanel');
+const finalScoreText = document.getElementById('finalScoreText');
+const gameOverHint = document.getElementById('gameOverHint');
 const restartButton = document.getElementById('restartButton');
+const homeButton = document.getElementById('homeButton');
+const accountStorageKey = 'cube_assault_account';
 
 restartButton.addEventListener('click', (event) => {
   event.stopPropagation();
   if (gameOver) {
     resetGame();
     overlay.style.display = 'none';
+    overlay.classList.remove('game-over');
     restartButton.style.display = 'none';
     setPointerLock();
   }
 });
+
+function showStartOverlay() {
+  overlay.classList.remove('game-over');
+  overlayIntro?.classList.remove('hidden');
+  instructions?.classList.remove('hidden');
+  gameOverPanel?.classList.add('hidden');
+  restartButton.style.display = 'none';
+  homeButton.style.display = 'inline-block';
+  status.textContent = 'Status: click to start';
+}
+
+function showGameOverScreen(finalScore) {
+  overlay.classList.add('game-over');
+  overlayIntro?.classList.add('hidden');
+  instructions?.classList.add('hidden');
+  gameOverPanel?.classList.remove('hidden');
+  finalScoreText.textContent = `Final Score: ${finalScore}`;
+  gameOverHint.textContent = finalScore >= 500 ? 'You pushed the arena to its limits.' : 'The arena claimed your run.';
+  restartButton.style.display = 'inline-block';
+  homeButton.style.display = 'inline-block';
+  status.textContent = `Status: mission failed — score ${finalScore}`;
+}
+
+function getStoredAccount() {
+  try {
+    return JSON.parse(localStorage.getItem(accountStorageKey));
+  } catch {
+    return null;
+  }
+}
+
+async function persistScore(finalScore) {
+  const account = getStoredAccount();
+  if (!account?.username) return;
+
+  const updatedAccount = { ...account, score: finalScore };
+  localStorage.setItem(accountStorageKey, JSON.stringify(updatedAccount));
+
+  try {
+    const response = await fetch('/api/update-score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: account.username, score: finalScore }),
+    });
+
+    const result = await response.json().catch(() => null);
+    if (result?.success && typeof result.score === 'number') {
+      updatedAccount.score = result.score;
+      localStorage.setItem(accountStorageKey, JSON.stringify(updatedAccount));
+    }
+  } catch {
+    // Ignore persistence failures and keep the local score.
+  }
+}
 
 const hpFlashOverlay = document.createElement('div');
 hpFlashOverlay.id = 'hpFlashOverlay';
@@ -633,32 +695,53 @@ for (const pos of [
 }
 
 function createEnemyScars(enemy) {
-  const scarMeshes = [];
+  const scarGroups = [];
   const scarPositions = [
-    { x: 0.16, y: 0.06, z: 0.51, rotX: 0, rotY: 0, rotZ: 0.65 },
-    { x: -0.14, y: 0.08, z: 0.51, rotX: 0, rotY: 0, rotZ: -0.4 },
-    { x: 0.42, y: -0.02, z: 0.28, rotX: 0, rotY: 1.1, rotZ: 0 },
-    { x: -0.38, y: -0.08, z: 0.24, rotX: 0, rotY: -1.0, rotZ: 0 },
-    { x: 0.12, y: -0.55, z: 0.22, rotX: 0.7, rotY: 0, rotZ: 0.15 },
+    { x: 0.16, y: 0.06, z: 0.51, rotX: 0, rotY: 0, rotZ: 0.65, chunkX: 0.05, chunkY: 0.01 },
+    { x: -0.14, y: 0.08, z: 0.51, rotX: 0, rotY: 0, rotZ: -0.4, chunkX: -0.05, chunkY: -0.01 },
+    { x: 0.42, y: -0.02, z: 0.28, rotX: 0, rotY: 1.1, rotZ: 0, chunkX: 0.04, chunkY: 0.02 },
+    { x: -0.38, y: -0.08, z: 0.24, rotX: 0, rotY: -1.0, rotZ: 0, chunkX: -0.04, chunkY: -0.01 },
+    { x: 0.12, y: -0.55, z: 0.22, rotX: 0.7, rotY: 0, rotZ: 0.15, chunkX: 0.02, chunkY: -0.03 },
   ];
 
   scarPositions.forEach((entry) => {
-    const scarGeom = new THREE.BoxGeometry(0.18, 0.04, 0.01);
-    const scarMat = new THREE.MeshBasicMaterial({
-      color: 0x5a2a2a,
+    const scarGroup = new THREE.Group();
+
+    const woundGeom = new THREE.BoxGeometry(0.16, 0.08, 0.04);
+    const woundMat = new THREE.MeshStandardMaterial({
+      color: 0x3f1717,
+      emissive: 0x200606,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.74,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      roughness: 0.9,
+      metalness: 0,
     });
-    const scar = new THREE.Mesh(scarGeom, scarMat);
-    scar.position.set(entry.x, entry.y, entry.z);
-    scar.rotation.set(entry.rotX, entry.rotY, entry.rotZ);
-    enemy.add(scar);
-    scarMeshes.push(scar);
+    const wound = new THREE.Mesh(woundGeom, woundMat);
+    wound.position.set(0, 0, 0.02);
+    scarGroup.add(wound);
+
+    const chunkGeom = new THREE.BoxGeometry(0.07, 0.05, 0.03);
+    const chunkMat = new THREE.MeshStandardMaterial({
+      color: 0x1c0909,
+      emissive: 0x110000,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      roughness: 1,
+      metalness: 0,
+    });
+    const chunk = new THREE.Mesh(chunkGeom, chunkMat);
+    chunk.position.set(entry.chunkX, entry.chunkY, 0.03);
+    scarGroup.add(chunk);
+
+    scarGroup.position.set(entry.x, entry.y, entry.z);
+    scarGroup.rotation.set(entry.rotX, entry.rotY, entry.rotZ);
+    enemy.add(scarGroup);
+    scarGroups.push(scarGroup);
   });
 
-  enemy.userData.scarMeshes = scarMeshes;
+  enemy.userData.scarMeshes = scarGroups;
 }
 
 function updateEnemyScars(enemy) {
@@ -666,12 +749,17 @@ function updateEnemyScars(enemy) {
 
   const healthRatio = Math.max(0, Math.min(1, enemy.userData.health / enemy.userData.maxHealth));
   const damageLevel = 1 - healthRatio;
-  const opacity = 0.16 + damageLevel * 0.72;
+  const intensity = 0.24 + damageLevel * 0.68;
+  const scale = 0.75 + damageLevel * 0.35;
 
-  enemy.userData.scarMeshes.forEach((scar) => {
-    if (scar.material) {
-      scar.material.opacity = opacity;
-    }
+  enemy.userData.scarMeshes.forEach((scarGroup) => {
+    scarGroup.scale.setScalar(scale);
+
+    scarGroup.children.forEach((child) => {
+      if (child.material) {
+        child.material.opacity = intensity;
+      }
+    });
   });
 }
 
@@ -871,9 +959,9 @@ function damagePlayer(amount) {
   
   if (player.health <= 0) {
     gameOver = true;
-    status.textContent = "GAME OVER! Click Restart Game.";
+    persistScore(score);
+    showGameOverScreen(score);
     overlay.style.display = 'block';
-    restartButton.style.display = 'inline-block';
     if (document.pointerLockElement === renderer.domElement) {
       document.exitPointerLock();
     }
@@ -1598,6 +1686,7 @@ document.addEventListener('pointerlockchange', () => {
   updateStatus();
 });
 
+showStartOverlay();
 updateGameUI(); // Initial UI update
 updateStatus(); // Initial status update
 let animationFrameId = requestAnimationFrame(animate); // Start the animation loop

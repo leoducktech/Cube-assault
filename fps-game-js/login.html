@@ -101,21 +101,63 @@
           <form id="login-form" class="space-y-5 rounded-[1.75rem] border border-amber-400/10 bg-black/60 p-6 shadow-[inset_0_0_60px_rgba(251,191,36,0.08)]">
             <div>
               <label class="block text-sm font-semibold uppercase tracking-[0.18em] text-amber-300">Username</label>
-              <input type="text" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Enter your username" required>
+              <input name="username" type="text" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Enter your username" required>
             </div>
             <div>
               <label class="block text-sm font-semibold uppercase tracking-[0.18em] text-amber-300">Password</label>
-              <input type="password" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Enter your password" required>
+              <input name="password" type="password" class="mt-2 w-full rounded-2xl border border-amber-600/40 bg-slate-950/90 px-4 py-3 text-amber-100 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30" placeholder="Enter your password" required>
             </div>
             <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] text-slate-950 shadow-xl shadow-amber-500/20 transition hover:bg-amber-400">Launch Battle</button>
             <div id="login-message" class="mt-4 text-sm text-amber-200"></div>
-            <div id="login-message" class="mt-4 text-sm text-amber-200"></div>
             <div class="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-center text-xs text-amber-200">Tip: click the game screen to lock camera control and begin moving.</div>
           </form>
+          <script>
+            const loginForm = document.getElementById('login-form');
+            const loginMessage = document.getElementById('login-message');
+
+            loginForm.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              loginMessage.textContent = '';
+              loginMessage.className = 'mt-4 text-sm text-amber-200';
+
+              const formData = new FormData(loginForm);
+              const payload = {
+                username: formData.get('username'),
+                password: formData.get('password'),
+              };
+
+              try {
+                const response = await fetch('/api/login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                  loginMessage.textContent = result.error || 'Login failed.';
+                  loginMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                  return;
+                }
+
+                loginMessage.textContent = 'Login successful. Redirecting...';
+                loginMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
+                localStorage.setItem('cube_assault_account', JSON.stringify({
+                  username: payload.username,
+                  email: result.email || '',
+                }));
+                setTimeout(() => window.location.href = 'account.html', 1000);
+              } catch (error) {
+                loginMessage.textContent = 'Network error. Please try again.';
+                loginMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+              }
+            });
+          </script>
         </div>
 
         <div class="mt-8 flex flex-col gap-3 text-sm text-amber-200/80 sm:flex-row sm:items-center sm:justify-between">
           <div class="space-x-4 text-center sm:text-left">
+            <a href="home.html" class="text-amber-300 transition hover:text-amber-100">Back home</a>
             <a href="index.html" class="text-amber-300 transition hover:text-amber-100">&larr; Back to Game</a>
             <a href="signup.html" class="text-amber-300 transition hover:text-amber-100">Create account</a>
           </div>

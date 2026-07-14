@@ -3,12 +3,20 @@ export default {
     try {
       const url = new URL(request.url);
 
-      if (url.pathname === '/api/signup' && request.method === 'OPTIONS') {
+      if (request.method === 'OPTIONS' && (url.pathname === '/api/signup' || url.pathname === '/api/login' || url.pathname === '/api/update-score')) {
         return corsResponse();
       }
 
       if (url.pathname === '/api/signup' && request.method === 'POST') {
         return await handleSignup(request, env);
+      }
+
+      if (url.pathname === '/api/login' && request.method === 'POST') {
+        return await handleLogin(request, env);
+      }
+
+      if (url.pathname === '/api/update-score' && request.method === 'POST') {
+        return await handleUpdateScore(request, env);
       }
 
       return new Response('Not found', {
@@ -41,17 +49,9 @@ async function handleSignup(request, env) {
     return jsonResponse({ success: false, error: 'Passwords do not match.' }, 400);
   }
 
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      username TEXT UNIQUE,
-      email TEXT UNIQUE,
-      password_hash TEXT,
-      created_at TEXT
-    )`
-  ).run();
+  await ensureScoreColumn(env);
 
-  const existing = await env.DB.prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1')
+  const existing = await env.DB.prepare('SELECT username FROM users WHERE username = ? OR email = ? LIMIT 1')
     .bind(username, email)
     .first();
 
@@ -59,15 +59,58 @@ async function handleSignup(request, env) {
     return jsonResponse({ success: false, error: 'Username or email already in use.' }, 409);
   }
 
-  const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(password);
-  const createdAt = new Date().toISOString();
 
-  await env.DB.prepare('INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(userId, username, email, passwordHash, createdAt)
+  await env.DB.prepare('INSERT INTO users (username, email, password, score) VALUES (?, ?, ?, 0)')
+    .bind(username, email, passwordHash)
     .run();
 
   return jsonResponse({ success: true, message: 'Account created successfully.' }, 201);
+}
+
+async function handleLogin(request, env) {
+  const body = await request.json();
+  const username = String(body.username || '').trim();
+  const password = String(body.password || '');
+
+  if (!username || !password) {
+    return jsonResponse({ success: false, error: 'Username and password are required.' }, 400);
+  }
+
+  await ensureScoreColumn(env);
+
+  const account = await env.DB.prepare('SELECT username, email, password, score FROM users WHERE username = ? LIMIT 1')
+    .bind(username)
+    .first();
+
+  if (!account) {
+    return jsonResponse({ success: false, error: 'Account not found.' }, 404);
+  }
+
+  const passwordHash = await hashPassword(password);
+  if (account.password !== passwordHash) {
+    return jsonResponse({ success: false, error: 'Incorrect password.' }, 401);
+  }
+
+  return jsonResponse({ success: true, email: account.email, score: Number(account.score || 0) }, 200);
+}
+
+async function handleUpdateScore(request, env) {
+  const body = await request.json();
+  const username = String(body.username || '').trim();
+  const score = Number(body.score || 0);
+
+  if (!username) {
+    return jsonResponse({ success: false, error: 'Username is required.' }, 400);
+  }
+
+  await ensureScoreColumn(env);
+  await env.DB.prepare('UPDATE users SET score = MAX(COALESCE(score, 0), ?) WHERE username = ?')
+    .bind(score, username)
+    .run();
+
+  const updated = await env.DB.prepare('SELECT score FROM users WHERE username = ? LIMIT 1').bind(username).first();
+  return jsonResponse({ success: true, score: Number(updated?.score || 0) }, 200);
 }
 
 async function hashPassword(password) {
@@ -100,4 +143,12 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
       ...extraHeaders,
     },
   });
+}
+
+async function ensureScoreColumn(env) {
+  try {
+    await env.DB.prepare('ALTER TABLE users ADD COLUMN score INTEGER DEFAULT 0').run();
+  } catch {
+    // Ignore if the column already exists.
+  }
 }
