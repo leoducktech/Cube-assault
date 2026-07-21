@@ -584,6 +584,15 @@ function startNextWave() {
     const health = wave.baseHealth + (Math.random() - 0.5) * 2 * wave.healthVariance;
     const speed = wave.baseSpeed + (Math.random() - 0.5) * 2 * wave.speedVariance;
     const emissiveColor = wave.emissiveColor || 0x000000;
+    const isBossRound = currentRound === waves.length;
+    let enemyType = 'normal';
+    if (isBossRound) {
+      enemyType = 'boss';
+    } else if (i % 5 === 0) {
+      enemyType = 'heavy';
+    } else if (i % 5 === 2) {
+      enemyType = 'light';
+    }
 
     let spawnX, spawnZ;
     let attempts = 0;
@@ -607,7 +616,7 @@ function startNextWave() {
     );
 
 
-    createEnemy(spawnX, spawnZ, health, speed, wave.color, wave.scale, emissiveColor);
+    createEnemy(spawnX, spawnZ, health, speed, wave.color, wave.scale, emissiveColor, enemyType);
   }
   updateGameUI();
 }
@@ -763,59 +772,133 @@ function updateEnemyScars(enemy) {
   });
 }
 
-function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1, emissiveColor = 0x000000) {
+function getEnemyVariantConfig(type, color, emissiveColor) {
+  switch (type) {
+    case 'heavy':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(1.25, 1.4, 1.15),
+        bodyColor: 0x5f4938,
+        bodyEmissive: 0x170c05,
+        bodyEmissiveIntensity: 0.35,
+        armGeometry: new THREE.BoxGeometry(0.34, 0.95, 0.32),
+        armColor: 0x4d3c2d,
+        armEmissive: 0x140a04,
+        armEmissiveIntensity: 0.2,
+        legGeometry: new THREE.BoxGeometry(0.36, 1.0, 0.34),
+        legColor: 0x292421,
+        eyeColor: 0x040404,
+        scaleMultiplier: 1.14,
+        healthMultiplier: 1.9,
+        speedMultiplier: 0.75,
+      };
+    case 'light':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(0.76, 0.84, 0.82),
+        bodyColor: 0x7edbff,
+        bodyEmissive: 0x0e2c47,
+        bodyEmissiveIntensity: 0.45,
+        armGeometry: new THREE.BoxGeometry(0.2, 0.64, 0.2),
+        armColor: 0x6bc6f0,
+        armEmissive: 0x0b2433,
+        armEmissiveIntensity: 0.25,
+        legGeometry: new THREE.BoxGeometry(0.24, 0.72, 0.24),
+        legColor: 0x1f2b36,
+        eyeColor: 0xf9ffff,
+        scaleMultiplier: 0.82,
+        healthMultiplier: 0.7,
+        speedMultiplier: 1.25,
+      };
+    case 'boss':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(1, 1, 1),
+        bodyColor: color,
+        bodyEmissive: emissiveColor,
+        bodyEmissiveIntensity: 0.75,
+        armGeometry: new THREE.BoxGeometry(0.25, 0.7, 0.25),
+        armColor: color,
+        armEmissive: emissiveColor,
+        armEmissiveIntensity: 0.55,
+        legGeometry: new THREE.BoxGeometry(0.3, 0.8, 0.3),
+        legColor: 0x333333,
+        eyeColor: 0x000000,
+        scaleMultiplier: 1,
+        healthMultiplier: 1,
+        speedMultiplier: 1,
+      };
+    default:
+      return {
+        bodyGeometry: new THREE.BoxGeometry(1, 1, 1),
+        bodyColor: color,
+        bodyEmissive: emissiveColor,
+        bodyEmissiveIntensity: emissiveColor !== 0x000000 ? 0.75 : 0,
+        armGeometry: new THREE.BoxGeometry(0.25, 0.7, 0.25),
+        armColor: color,
+        armEmissive: emissiveColor,
+        armEmissiveIntensity: emissiveColor !== 0x000000 ? 0.55 : 0,
+        legGeometry: new THREE.BoxGeometry(0.3, 0.8, 0.3),
+        legColor: 0x333333,
+        eyeColor: 0x000000,
+        scaleMultiplier: 1,
+        healthMultiplier: 1,
+        speedMultiplier: 1,
+      };
+  }
+}
+
+function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1, emissiveColor = 0x000000, type = 'normal') {
   const group = new THREE.Group();
+  const variant = getEnemyVariantConfig(type, color, emissiveColor);
+  const scaledHealth = health * (variant.healthMultiplier || 1);
+  const scaledSpeed = speed * (variant.speedMultiplier || 1);
+  const scaledBaseScale = scale * (variant.scaleMultiplier || 1);
 
   // Body
-  const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
   const bodyMat = new THREE.MeshStandardMaterial({
-    color: color,
-    emissive: emissiveColor,
-    emissiveIntensity: emissiveColor !== 0x000000 ? 0.75 : 0,
+    color: variant.bodyColor,
+    emissive: variant.bodyEmissive,
+    emissiveIntensity: variant.bodyEmissiveIntensity || 0,
   });
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  const body = new THREE.Mesh(variant.bodyGeometry, bodyMat);
   body.castShadow = true;
   body.receiveShadow = true;
   group.add(body);
 
   // Arms
-  const armGeo = new THREE.BoxGeometry(0.25, 0.7, 0.25);
   const armMat = new THREE.MeshStandardMaterial({
-    color: color,
-    emissive: emissiveColor,
-    emissiveIntensity: emissiveColor !== 0x000000 ? 0.55 : 0,
+    color: variant.armColor,
+    emissive: variant.armEmissive,
+    emissiveIntensity: variant.armEmissiveIntensity || 0,
   });
-  const leftArm = new THREE.Mesh(armGeo, armMat);
-  leftArm.position.set(-0.65, 0, 0);
+  const leftArm = new THREE.Mesh(variant.armGeometry, armMat);
+  leftArm.position.set(type === 'heavy' ? -0.75 : type === 'light' ? -0.5 : -0.65, 0, 0);
   leftArm.castShadow = true;
   group.add(leftArm);
-  const rightArm = new THREE.Mesh(armGeo, armMat);
-  rightArm.position.set(0.65, 0, 0);
+  const rightArm = new THREE.Mesh(variant.armGeometry, armMat);
+  rightArm.position.set(type === 'heavy' ? 0.75 : type === 'light' ? 0.5 : 0.65, 0, 0);
   rightArm.castShadow = true;
   group.add(rightArm);
 
   // Legs
-  const legGeo = new THREE.BoxGeometry(0.3, 0.8, 0.3);
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-  const leftLeg = new THREE.Mesh(legGeo, legMat);
-  leftLeg.position.set(-0.3, -0.9, 0);
+  const legMat = new THREE.MeshStandardMaterial({ color: variant.legColor });
+  const leftLeg = new THREE.Mesh(variant.legGeometry, legMat);
+  leftLeg.position.set(type === 'heavy' ? -0.35 : type === 'light' ? -0.2 : -0.3, -0.9, 0);
   leftLeg.castShadow = true;
   group.add(leftLeg);
-  const rightLeg = new THREE.Mesh(legGeo, legMat);
-  rightLeg.position.set(0.3, -0.9, 0);
+  const rightLeg = new THREE.Mesh(variant.legGeometry, legMat);
+  rightLeg.position.set(type === 'heavy' ? 0.35 : type === 'light' ? 0.2 : 0.3, -0.9, 0);
   rightLeg.castShadow = true;
   group.add(rightLeg);
 
   // Face
   const eyeGeo = new THREE.BoxGeometry(0.2, 0.2, 0.1);
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: variant.eyeColor });
   const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-  leftEye.position.set(-0.25, 0.2, 0.51);
+  leftEye.position.set(type === 'light' ? -0.18 : -0.25, 0.2, 0.51);
   group.add(leftEye);
   const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-  rightEye.position.set(0.25, 0.2, 0.51);
+  rightEye.position.set(type === 'light' ? 0.18 : 0.25, 0.2, 0.51);
   group.add(rightEye);
-  const mouthGeo = new THREE.BoxGeometry(0.5, 0.1, 0.1);
+  const mouthGeo = new THREE.BoxGeometry(type === 'light' ? 0.34 : 0.5, 0.1, 0.1);
   const mouth = new THREE.Mesh(mouthGeo, eyeMat);
   mouth.position.set(0, -0.25, 0.51);
   group.add(mouth);
@@ -837,10 +920,11 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   hbFg.position.z = 0.01; // Slightly in front of the background
   healthBarGroup.add(hbFg);
 
-  group.userData.health = health;
-  group.userData.maxHealth = health;
-  group.userData.speed = speed;
-  group.userData.baseScale = scale;
+  group.userData.health = scaledHealth;
+  group.userData.maxHealth = scaledHealth;
+  group.userData.speed = scaledSpeed;
+  group.userData.baseScale = scaledBaseScale;
+  group.userData.variant = type;
   group.userData.color = color;
   group.userData.healthBar = hbFg;
   group.userData.healthBarContainer = healthBarGroup;
@@ -868,24 +952,29 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   return group;
 }
 
-function spawnBossProjectile(sourcePos, color, sizeScale = 1) {
-  const baseSize = 0.6; // base cube size
+function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss') {
+  const baseSize = variant === 'heavy' ? 0.45 : 0.6;
   const size = baseSize * Math.max(0.8, sizeScale);
   const pGeo = new THREE.BoxGeometry(size, size, size);
-  const pMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.6 });
+  const pMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: variant === 'heavy' ? 0.3 : 0.6 });
   const projectile = new THREE.Mesh(pGeo, pMat);
   projectile.position.copy(sourcePos);
-  projectile.position.y += 1.5; // Shoot from chest height
+  projectile.position.y += 1.2;
 
-  // Calculate a unit direction toward the player and spawn the projectile
-  // slightly in front of the boss to avoid immediate collision with its owner.
-  const unitDir = new THREE.Vector3().subVectors(player.position, projectile.position).normalize();
-  projectile.userData.velocity = unitDir.clone().multiplyScalar(10 + 4 * Math.max(0.5, sizeScale)); // Projectile speed scaled
-  const spawnOffset = Math.max(0.6, size * 0.8) + 0.4; // meters forward to clear the boss hitbox
-  projectile.position.addScaledVector(unitDir, spawnOffset);
-  projectile.userData.life = 5.0; // Seconds before it disappears
-  projectile.userData.damage = Math.ceil(12 * Math.max(1, sizeScale));
+  const dir = new THREE.Vector3().subVectors(player.position, projectile.position);
+  if (dir.lengthSq() < 0.0001) {
+    dir.set(0, 0, -1);
+  } else {
+    dir.normalize();
+  }
+
+  projectile.userData.velocity = dir.clone().multiplyScalar(variant === 'heavy' ? 7.5 : 10 + 4 * Math.max(0.5, sizeScale));
+  const spawnOffset = Math.max(0.4, size * 0.8) + 0.2;
+  projectile.position.addScaledVector(dir, spawnOffset);
+  projectile.userData.life = variant === 'heavy' ? 1.2 : 5.0;
+  projectile.userData.damage = Math.ceil((variant === 'heavy' ? 8 : 12) * Math.max(1, sizeScale));
   projectile.userData.reflected = false;
+  projectile.userData.variant = variant;
 
   scene.add(projectile);
   projectiles.push(projectile);
@@ -1331,11 +1420,16 @@ function animate() {
       player.damageCooldown = 1.0; // 1 second cooldown before taking damage again
     }
 
-    if (enemy.userData.baseScale > 1) {
+    const isBoss = enemy.userData.baseScale > 1;
+    const isHeavy = enemy.userData.variant === 'heavy';
+    if (isBoss || isHeavy) {
       enemy.userData.shootTimer = (enemy.userData.shootTimer || 0) - delta;
       if (enemy.userData.shootTimer <= 0) {
-        spawnBossProjectile(enemy.position, enemy.userData.color, enemy.userData.baseScale || 1);
-        enemy.userData.shootTimer = 1.5 + Math.random(); // Wait 1.5 to 2.5 seconds
+        const distanceToPlayer = enemy.position.distanceTo(player.position);
+        if (distanceToPlayer <= (isBoss ? 24 : 12)) {
+          spawnBossProjectile(enemy.position, enemy.userData.color, enemy.userData.baseScale || 1, isHeavy ? 'heavy' : 'boss');
+        }
+        enemy.userData.shootTimer = isHeavy ? 2.4 + Math.random() * 0.8 : 1.5 + Math.random();
       }
     }
 
