@@ -3,7 +3,7 @@ export default {
     try {
       const url = new URL(request.url);
 
-      if (request.method === 'OPTIONS' && (url.pathname === '/api/signup' || url.pathname === '/api/login' || url.pathname === '/api/update-score')) {
+      if (request.method === 'OPTIONS' && (url.pathname === '/api/signup' || url.pathname === '/api/login' || url.pathname === '/api/update-score' || url.pathname === '/api/leaderboard')) {
         return corsResponse();
       }
 
@@ -17,6 +17,10 @@ export default {
 
       if (url.pathname === '/api/update-score' && request.method === 'POST') {
         return await handleUpdateScore(request, env);
+      }
+
+      if (url.pathname === '/api/leaderboard' && request.method === 'GET') {
+        return await handleLeaderboard(env);
       }
 
       return new Response('Not found', {
@@ -111,6 +115,15 @@ async function handleUpdateScore(request, env) {
 
   const updated = await env.DB.prepare('SELECT score FROM users WHERE username = ? LIMIT 1').bind(username).first();
   return jsonResponse({ success: true, score: Number(updated?.score || 0) }, 200);
+}
+
+async function handleLeaderboard(env) {
+  await ensureScoreColumn(env);
+  const result = await env.DB.prepare('SELECT username, score FROM users WHERE score IS NOT NULL ORDER BY score DESC LIMIT 10').all();
+  return jsonResponse({ success: true, entries: (result.results || []).map((entry) => ({
+    username: entry.username,
+    score: Number(entry.score || 0),
+  })) }, 200);
 }
 
 async function hashPassword(password) {

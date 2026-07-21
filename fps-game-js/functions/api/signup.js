@@ -61,6 +61,18 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: true, score: Number(updated?.score || 0) }, 200);
   }
 
+  if (pathname === '/api/leaderboard') {
+    await ensureScoreColumn(env);
+    const entries = await env.DB.prepare(
+      'SELECT username, score FROM users WHERE score IS NOT NULL ORDER BY score DESC LIMIT 10'
+    ).all();
+
+    return jsonResponse({ success: true, entries: (entries.results || []).map((entry) => ({
+      username: entry.username,
+      score: Number(entry.score || 0),
+    })) }, 200);
+  }
+
   const username = String(body.username || '').trim();
   const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');

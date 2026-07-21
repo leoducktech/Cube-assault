@@ -80,6 +80,19 @@
           </div>
         </div>
 
+        <div class="mt-8 rounded-[1.75rem] border border-cyan-400/15 bg-slate-900/80 p-6 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
+          <div class="mb-5 flex items-center justify-between">
+            <div>
+              <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/70">Hall of fame</p>
+              <h2 class="mt-2 text-2xl font-black tracking-tight text-amber-100">Top operatives</h2>
+            </div>
+            <div class="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-200">Live scores</div>
+          </div>
+
+          <div id="leaderboard-status" class="mb-4 text-sm text-amber-200/80">Loading leaderboard...</div>
+          <div id="leaderboard-list" class="space-y-3"></div>
+        </div>
+
         <div class="mt-8 flex flex-col gap-3 text-sm text-amber-200/80 sm:flex-row sm:items-center sm:justify-between">
           <a href="login.html" class="text-amber-300 transition hover:text-amber-100">Return to login</a>
           <span class="inline-flex rounded-full border border-amber-400/15 bg-amber-400/5 px-3 py-1 uppercase tracking-[0.2em] text-amber-200">Cube Assault Profile</span>
@@ -94,6 +107,8 @@
       const accountEmail = document.getElementById('account-email');
       const accountScore = document.getElementById('account-score');
       const accountMessage = document.getElementById('account-message');
+      const leaderboardStatus = document.getElementById('leaderboard-status');
+      const leaderboardList = document.getElementById('leaderboard-list');
       const logoutBtn = document.getElementById('logout-btn');
 
       function loadAccount() {
@@ -121,12 +136,52 @@
         }
       }
 
+      async function loadLeaderboard() {
+        try {
+          const response = await fetch('/api/leaderboard');
+          const result = await response.json();
+
+          if (!response.ok || !Array.isArray(result.entries)) {
+            leaderboardStatus.textContent = 'Leaderboard unavailable right now.';
+            return;
+          }
+
+          leaderboardList.innerHTML = '';
+          if (!result.entries.length) {
+            leaderboardStatus.textContent = 'No scores recorded yet — be the first to climb the chart.';
+            return;
+          }
+
+          leaderboardStatus.textContent = 'Top operators by high score';
+          result.entries.forEach((entry, index) => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between rounded-2xl border border-cyan-400/15 bg-slate-950/70 px-4 py-3';
+            const badgeClass = index === 0 ? 'text-amber-300' : index === 1 ? 'text-slate-200' : 'text-cyan-200';
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '◆';
+            row.innerHTML = `
+              <div class="flex items-center gap-3">
+                <span class="text-lg ${badgeClass}">${medal}</span>
+                <div>
+                  <div class="font-semibold text-amber-100">${entry.username}</div>
+                  <div class="text-xs uppercase tracking-[0.2em] text-amber-200/70">${index === 0 ? 'Commander' : index === 1 ? 'Specialist' : index === 2 ? 'Rogue' : 'Operative'}</div>
+                </div>
+              </div>
+              <div class="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-sm font-bold text-amber-200">${entry.score}</div>
+            `;
+            leaderboardList.appendChild(row);
+          });
+        } catch (error) {
+          leaderboardStatus.textContent = 'Leaderboard unavailable right now.';
+        }
+      }
+
       logoutBtn.addEventListener('click', () => {
         localStorage.removeItem(storageKey);
         window.location.href = 'login.html';
       });
 
       loadAccount();
+      loadLeaderboard();
     </script>
   </body>
 </html>
