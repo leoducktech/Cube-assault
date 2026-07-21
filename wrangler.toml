@@ -1,4 +1,4 @@
-name = "fps-game-js"
+name = "cube-assault"
 compatibility_date = "2025-01-01"
 main="fps-game-js/worker.js"
 
