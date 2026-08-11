@@ -202,10 +202,15 @@ function createNeonWallTexture() {
   return texture;
 }
 
-const floorTexture = createNeonFloorTexture();
 const floor = new THREE.Mesh(
   new THREE.BoxGeometry(90, 1, 90),
-  new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.75, metalness: 0.35, color: 0x040511 })
+  new THREE.MeshStandardMaterial({
+    color: 0x080d1d,
+    emissive: 0x0b1730,
+    emissiveIntensity: 0.25,
+    roughness: 0.82,
+    metalness: 0.2,
+  })
 );
 floor.position.y = -0.5;
 floor.receiveShadow = true;
@@ -845,6 +850,135 @@ function getEnemyVariantConfig(type, color, emissiveColor) {
   }
 }
 
+function createHeavyRamMarker(enemy) {
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0.08, 0),
+    new THREE.Vector3(6, 0.08, 0),
+  ]);
+  const material = new THREE.LineBasicMaterial({
+    color: 0xff3b30,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false,
+  });
+
+  const marker = new THREE.Line(geometry, material);
+  marker.visible = false;
+  enemy.add(marker);
+  enemy.userData.ramMarker = marker;
+}
+
+function updateHeavyRamMarker(enemy) {
+  const marker = enemy.userData.ramMarker;
+  if (!marker) return;
+
+  const activeState = enemy.userData.ramState === 'windup' || enemy.userData.ramState === 'charge';
+  marker.visible = activeState;
+  if (!activeState) return;
+
+  const dir = enemy.userData.ramDirection ? enemy.userData.ramDirection.clone() : new THREE.Vector3(0, 0, -1);
+  if (dir.lengthSq() < 0.001) dir.set(0, 0, -1);
+  dir.y = 0; dir.normalize();
+
+  const range = Math.max(8, Math.min(20, enemy.position.distanceTo(player.position)));
+  marker.geometry.setFromPoints([
+    new THREE.Vector3(0, 0.08, 0),
+    new THREE.Vector3(range, 0.08, 0),
+  ]);
+  marker.rotation.set(0, Math.atan2(dir.x, dir.z), 0);
+  marker.material.opacity = enemy.userData.ramState === 'charge' ? 1 : 0.82;
+  marker.material.color.setHex(enemy.userData.ramState === 'charge' ? 0xff2d2d : 0xff8a5b);
+}
+
+function handleHeavyRamAttack(enemy, delta, currentScale) {
+  if (enemy.userData.variant !== 'heavy') return false;
+
+  enemy.userData.ramCooldown = Math.max(0, (enemy.userData.ramCooldown || 0) - delta);
+
+  if (enemy.userData.ramState === 'windup') {
+    enemy.userData.ramWindup = (enemy.userData.ramWindup || 0) - delta;
+    updateHeavyRamMarker(enemy);
+    const swing = Math.sin(clock.elapsedTime * 12) * 1.1;
+    enemy.userData.leftArm.rotation.x = -1.4 + swing * 0.35;
+    enemy.userData.rightArm.rotation.x = 1.4 - swing * 0.35;
+    if (enemy.userData.ramWindup <= 0) {
+      enemy.userData.ramState = 'charge';
+      enemy.userData.ramChargeTime = 0.72;
+    }
+    return true;
+  }
+
+  if (enemy.userData.ramState === 'charge') {
+    enemy.userData.ramChargeTime = (enemy.userData.ramChargeTime || 0.72) - delta;
+    const chargeDir = enemy.userData.ramDirection ? enemy.userData.ramDirection.clone() : new THREE.Vector3(0, 0, -1);
+    chargeDir.y = 0;
+    chargeDir.normalize();
+
+    const oldPos = enemy.position.clone();
+    const movement = chargeDir.clone().multiplyScalar(13 * delta);
+
+    enemy.position.x += movement.x;
+    if (checkEnemyCollision(enemy)) {
+      enemy.position.x = oldPos.x;
+      enemy.userData.ramState = 'cooldown';
+      enemy.userData.ramCooldown = 2.8;
+      updateHeavyRamMarker(enemy);
+      return true;
+    }
+
+    enemy.position.z += movement.z;
+    if (checkEnemyCollision(enemy)) {
+      enemy.position.z = oldPos.z;
+      enemy.userData.ramState = 'cooldown';
+      enemy.userData.ramCooldown = 2.8;
+      updateHeavyRamMarker(enemy);
+      return true;
+    }
+
+    enemy.lookAt(enemy.position.x + chargeDir.x, enemy.position.y, enemy.position.z + chargeDir.z);
+
+    if (enemy.position.distanceTo(player.position) < 1.5 * currentScale + 0.7) {
+      damagePlayer(18);
+      player.damageCooldown = 1.1;
+      enemy.userData.ramState = 'cooldown';
+      enemy.userData.ramCooldown = 3.2;
+      updateHeavyRamMarker(enemy);
+      return true;
+    }
+
+    if (enemy.userData.ramChargeTime <= 0) {
+      enemy.userData.ramState = 'cooldown';
+      enemy.userData.ramCooldown = 3.0;
+    }
+
+    updateHeavyRamMarker(enemy);
+    return true;
+  }
+
+  if (enemy.userData.ramState === 'cooldown') {
+    updateHeavyRamMarker(enemy);
+    if (enemy.userData.ramCooldown <= 0) {
+      enemy.userData.ramState = 'idle';
+      if (enemy.userData.ramMarker) enemy.userData.ramMarker.visible = false;
+    }
+    return true;
+  }
+
+  const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.position);
+  toPlayer.y = 0;
+  const distance = toPlayer.length();
+  if (distance <= 15 && enemy.userData.ramCooldown <= 0) {
+    enemy.userData.ramState = 'windup';
+    enemy.userData.ramWindup = 1.05;
+    enemy.userData.ramDirection = toPlayer.normalize();
+    enemy.userData.ramCooldown = 3.7;
+    updateHeavyRamMarker(enemy);
+    return true;
+  }
+
+  return false;
+}
+
 function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1, emissiveColor = 0x000000, type = 'normal') {
   const group = new THREE.Group();
   const variant = getEnemyVariantConfig(type, color, emissiveColor);
@@ -953,6 +1087,7 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
 }
 
 function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss') {
+  if (variant === 'heavy') return;
   const baseSize = variant === 'heavy' ? 0.45 : 0.6;
   const size = baseSize * Math.max(0.8, sizeScale);
   const pGeo = new THREE.BoxGeometry(size, size, size);
@@ -1013,6 +1148,7 @@ function damageEnemy(enemy, amount) {
     scene.remove(enemy);
     if (enemy.userData.helper) scene.remove(enemy.userData.helper);
     if (enemy.userData.healthBarContainer) scene.remove(enemy.userData.healthBarContainer);
+    if (enemy.userData.ramMarker) scene.remove(enemy.userData.ramMarker);
     
     score += 100;
     enemiesRemaining--;
@@ -1064,6 +1200,7 @@ function resetGame() {
   enemies.forEach(enemy => {
     scene.remove(enemy);
     if (enemy.userData.helper) scene.remove(enemy.userData.helper);
+    if (enemy.userData.ramMarker) scene.remove(enemy.userData.ramMarker);
   });
   enemies.length = 0;
 
@@ -1189,13 +1326,27 @@ function updateStatus() {
 }
 
 function checkEnemyCollision(enemy) {
-  const enemyBox = new THREE.Box3().setFromObject(enemy);
+  enemy.position.y = 1.3;
+  enemy.updateMatrixWorld(true);
+  const enemyBox = new THREE.Box3().setFromObject(enemy).expandByScalar(0.08);
+
   for (const wall of walls) {
+    wall.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(wall);
     if (enemyBox.intersectsBox(box)) {
       return true;
     }
   }
+
+  for (const other of enemies) {
+    if (other === enemy) continue;
+    other.updateMatrixWorld(true);
+    const otherBox = new THREE.Box3().setFromObject(other).expandByScalar(0.08);
+    if (enemyBox.intersectsBox(otherBox)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -1207,6 +1358,7 @@ function collide(position) {
     new THREE.Vector3(position.x + radius, position.y + halfHeight, position.z + radius)
   );
   for (const wall of walls) {
+    wall.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(wall);
     if (playerBox.intersectsBox(box)) {
       return true;
@@ -1227,33 +1379,63 @@ function checkGround() {
   });
 }
 
-function findAvoidanceDirection(enemyPos, targetDir, searchAngles = 8) {
+function isBlockedForEnemy(enemy, position, radius = 0.9) {
+  const groundY = 1.3;
+  const enemyBox = new THREE.Box3(
+    new THREE.Vector3(position.x - radius, groundY - 1.6, position.z - radius),
+    new THREE.Vector3(position.x + radius, groundY + 0.8, position.z + radius)
+  );
+
+  for (const wall of walls) {
+    wall.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(wall);
+    if (enemyBox.intersectsBox(box)) {
+      return true;
+    }
+  }
+
+  for (const other of enemies) {
+    if (other === enemy) continue;
+    other.updateMatrixWorld(true);
+    const otherBox = new THREE.Box3().setFromObject(other).expandByScalar(0.08);
+    if (enemyBox.intersectsBox(otherBox)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function findAvoidanceDirection(enemy, enemyPos, targetDir, searchAngles = 8) {
   const testDir = targetDir.clone().normalize();
   const right = new THREE.Vector3(-testDir.z, 0, testDir.x).normalize();
 
   const testPositions = [
     { pos: enemyPos.clone().addScaledVector(testDir, 0.8), weight: 10 },
-    { pos: enemyPos.clone().addScaledVector(right, 0.6), weight: 4 },
-    { pos: enemyPos.clone().addScaledVector(right, -0.6), weight: 4 },
+    { pos: enemyPos.clone().addScaledVector(right, 0.9), weight: 5 },
+    { pos: enemyPos.clone().addScaledVector(right, -0.9), weight: 5 },
+    { pos: enemyPos.clone().addScaledVector(right, 1.4), weight: 3 },
+    { pos: enemyPos.clone().addScaledVector(right, -1.4), weight: 3 },
+    { pos: enemyPos.clone().addScaledVector(testDir, 1.4), weight: 2 },
   ];
 
-  for (let angle = 45; angle <= 360; angle += 45) {
+  for (let angle = 30; angle <= 330; angle += 30) {
     const rad = (angle * Math.PI) / 180;
     const rotDir = new THREE.Vector3(
       testDir.x * Math.cos(rad) - testDir.z * Math.sin(rad),
       0,
       testDir.x * Math.sin(rad) + testDir.z * Math.cos(rad)
     ).normalize();
-    testPositions.push({ pos: enemyPos.clone().addScaledVector(rotDir, 0.8), weight: Math.max(1, 10 - Math.abs(angle - 180) / 20) });
+    testPositions.push({ pos: enemyPos.clone().addScaledVector(rotDir, 1.1), weight: 4 });
   }
 
   let bestDir = testDir.clone();
-  let bestWeight = 0;
+  let bestWeight = -Infinity;
 
   for (const test of testPositions) {
-    if (!collide(test.pos)) {
+    if (!isBlockedForEnemy(enemy, test.pos, 0.85)) {
       const distToTarget = test.pos.distanceTo(player.position);
-      const weight = test.weight - distToTarget * 0.05;
+      const weight = test.weight - distToTarget * 0.06;
       if (weight > bestWeight) {
         bestWeight = weight;
         bestDir = new THREE.Vector3().subVectors(test.pos, enemyPos).normalize();
@@ -1261,6 +1443,7 @@ function findAvoidanceDirection(enemyPos, targetDir, searchAngles = 8) {
     }
   }
 
+  if (!bestDir.lengthSq()) bestDir = testDir.clone();
   return bestDir;
 }
 
@@ -1319,6 +1502,15 @@ function animate() {
       }
     }
     let isKnockedBack = false;
+    if (handleHeavyRamAttack(enemy, delta, Math.max(0.0001, enemy.userData.baseScale || 1))) {
+      if (enemy.userData.helper) enemy.userData.helper.update();
+      if (enemy.userData.healthBarContainer) {
+        enemy.userData.healthBarContainer.quaternion.copy(camera.quaternion);
+        updateEnemyHealthBar(enemy);
+      }
+      enemiesToKeep.push(enemy);
+      return;
+    }
     // --- Health-based Scaling ---
     const healthRatio = enemy.userData.health / enemy.userData.maxHealth;
     const baseScale = enemy.userData.baseScale || 1;
@@ -1360,8 +1552,11 @@ function animate() {
       
       // Check if direct path is blocked; if so, use pathfinding
       const testPos = enemy.position.clone().addScaledVector(moveDir, speed * delta * 1.2);
-      if (collide(testPos)) {
-        moveDir = findAvoidanceDirection(enemy.position, direction);
+      if (isBlockedForEnemy(enemy, testPos, 0.8)) {
+        moveDir = findAvoidanceDirection(enemy, enemy.position, direction);
+      }
+      if (isBlockedForEnemy(enemy, enemy.position.clone().addScaledVector(moveDir, speed * delta * 1.5), 0.85)) {
+        moveDir = findAvoidanceDirection(enemy, enemy.position, direction).multiplyScalar(1.1).normalize();
       }
       
       movement.addScaledVector(moveDir, speed * delta);
@@ -1420,16 +1615,15 @@ function animate() {
       player.damageCooldown = 1.0; // 1 second cooldown before taking damage again
     }
 
-    const isBoss = enemy.userData.baseScale > 1;
-    const isHeavy = enemy.userData.variant === 'heavy';
-    if (isBoss || isHeavy) {
+    const isBoss = enemy.userData.variant === 'boss';
+    if (isBoss) {
       enemy.userData.shootTimer = (enemy.userData.shootTimer || 0) - delta;
       if (enemy.userData.shootTimer <= 0) {
         const distanceToPlayer = enemy.position.distanceTo(player.position);
-        if (distanceToPlayer <= (isBoss ? 24 : 12)) {
-          spawnBossProjectile(enemy.position, enemy.userData.color, enemy.userData.baseScale || 1, isHeavy ? 'heavy' : 'boss');
+        if (distanceToPlayer <= 24) {
+          spawnBossProjectile(enemy.position, enemy.userData.color, enemy.userData.baseScale || 1, 'boss');
         }
-        enemy.userData.shootTimer = isHeavy ? 2.4 + Math.random() * 0.8 : 1.5 + Math.random();
+        enemy.userData.shootTimer = 1.5 + Math.random();
       }
     }
 
