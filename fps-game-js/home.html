@@ -146,20 +146,214 @@ c<!DOCTYPE html>
       box-shadow: 0 0 25px rgba(167, 139, 250, 0.3);
       transform: translateY(-2px);
     }
+    .dashboard-panel {
+      width: min(1100px, 100%);
+      display: grid;
+      grid-template-columns: 2.2fr 0.8fr;
+      gap: 24px;
+      margin: 0 auto 28px;
+      align-items: stretch;
+      max-width: 1100px;
+    }
+    .profile-card,
+    .leaderboard-panel,
+    .side-panel,
+    .info-card {
+      border: 1px solid rgba(98, 225, 255, 0.22);
+      border-radius: 20px;
+      background: rgba(8, 12, 29, 0.75);
+      box-shadow: 0 0 25px rgba(98, 225, 255, 0.08), inset 0 0 20px rgba(255,255,255,0.02);
+      backdrop-filter: blur(10px);
+    }
+    .profile-card {
+      padding: 24px;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .eyebrow {
+      font-size: 0.7rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      opacity: 0.8;
+      margin-bottom: 8px;
+    }
+    .panel-header h2,
+    .panel-header h3 {
+      font-size: clamp(1.8rem, 2vw, 2.5rem);
+      color: #f5f3ff;
+      letter-spacing: 0.04em;
+    }
+    .status-pill,
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(250, 204, 21, 0.3);
+      background: rgba(250, 204, 21, 0.08);
+      color: #fcd34d;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .stat-box {
+      padding: 16px 18px;
+      border-radius: 16px;
+      background: rgba(42, 76, 110, 0.18);
+      border: 1px solid rgba(125, 211, 252, 0.18);
+    }
+    .label {
+      display: block;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      opacity: 0.8;
+      margin-bottom: 10px;
+    }
+    .stat-box strong {
+      display: block;
+      color: #f8fafc;
+      font-size: 1.1rem;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+    .message-box {
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(20, 184, 166, 0.08);
+      border: 1px solid rgba(45, 212, 191, 0.2);
+      color: #c7f9f2;
+      line-height: 1.5;
+    }
+    .side-panel {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      justify-content: center;
+    }
+    .mini-btn {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 18px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.78rem;
+      font-weight: 700;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .mini-btn:hover {
+      transform: translateY(-2px);
+    }
+    .mini-btn.primary {
+      background: linear-gradient(135deg, #67e8f9, #a78bfa);
+      color: #020617;
+      box-shadow: 0 0 20px rgba(103, 232, 249, 0.35);
+    }
+    .mini-btn.secondary {
+      border: 1px solid rgba(167, 139, 250, 0.4);
+      background: rgba(167, 139, 250, 0.08);
+      color: #ddd6fe;
+    }
+    .leaderboard-panel {
+      width: min(1100px, 100%);
+      margin: 0 auto 36px;
+      padding: 22px 18px 18px;
+    }
+    .leaderboard-header {
+      margin-bottom: 16px;
+      padding: 0 6px;
+    }
+    .leaderboard-status {
+      color: #dbeafe;
+      font-size: 0.9rem;
+      opacity: 0.85;
+      margin: 0 6px 12px;
+    }
+    .leaderboard-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .leaderboard-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(96, 165, 250, 0.15);
+    }
+    .leaderboard-player {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+    .medal {
+      display: inline-flex;
+      width: 38px;
+      height: 38px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      font-size: 1.2rem;
+    }
+    .leaderboard-player strong {
+      display: block;
+      color: #f8fafc;
+      font-size: 1rem;
+    }
+    .leaderboard-player small {
+      display: block;
+      color: #93c5fd;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 0.62rem;
+      margin-top: 4px;
+    }
+    .score-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 70px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(250, 204, 21, 0.2);
+      background: rgba(250, 204, 21, 0.08);
+      color: #fef3c7;
+      font-weight: 700;
+    }
     .info-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 24px;
-      max-width: 1000px;
-      margin-top: 80px;
+      max-width: 1100px;
+      margin-top: 12px;
     }
     .info-card {
       padding: 24px;
-      border: 1px solid rgba(98, 225, 255, 0.25);
-      border-radius: 16px;
       background: rgba(10, 14, 40, 0.6);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 0 20px rgba(98, 225, 255, 0.1), inset 0 0 1px rgba(255, 255, 255, 0.05);
       transition: all 0.3s ease;
     }
     .info-card:hover {
@@ -190,7 +384,27 @@ c<!DOCTYPE html>
       text-align: center;
       z-index: 2;
     }
+    .audio-toggle {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 3;
+      border: 1px solid rgba(125, 211, 252, 0.5);
+      background: rgba(15, 23, 42, 0.78);
+      color: #dff7ff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    }
     @media (max-width: 768px) {
+      .container {
+        padding-top: 30px;
+        padding-bottom: 90px;
+      }
       .title {
         font-size: 2.5rem;
       }
@@ -204,13 +418,19 @@ c<!DOCTYPE html>
       .btn {
         min-width: 100%;
       }
+      .dashboard-panel {
+        grid-template-columns: 1fr;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
   <div class="glow-grid"></div>
   <div class="stars" id="starfield"></div>
-  
+
   <div class="container">
     <div class="header">
       <div class="title">⚔️ CUBE ASSAULT</div>
@@ -220,8 +440,61 @@ c<!DOCTYPE html>
 
     <div class="action-buttons">
       <a href="index.html" class="btn btn-play">▶ PLAY NOW</a>
-      <a href="login.html" class="btn btn-secondary">LOG IN</a>
+      <a href="login.html" class="btn btn-secondary" id="login-link">LOG IN</a>
       <a href="signup.html" class="btn btn-secondary">SIGN UP</a>
+      <button id="logout-btn" class="btn btn-secondary" type="button">LOG OUT</button>
+    </div>
+
+    <div class="dashboard-panel">
+      <div class="profile-card">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Operator profile</p>
+            <h2 id="account-title">Loading profile...</h2>
+          </div>
+          <span class="status-pill">Mission ready</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="label">Username</span>
+            <strong id="account-username">-</strong>
+          </div>
+          <div class="stat-box">
+            <span class="label">Email</span>
+            <strong id="account-email">-</strong>
+          </div>
+          <div class="stat-box">
+            <span class="label">Score</span>
+            <strong id="account-score">0</strong>
+          </div>
+          <div class="stat-box">
+            <span class="label">Status</span>
+            <strong id="account-status">Offline</strong>
+          </div>
+        </div>
+
+        <div id="account-message" class="message-box">No operator signed in yet.</div>
+      </div>
+
+      <div class="side-panel">
+        <a href="index.html" class="mini-btn primary">Play the Game</a>
+        <a href="login.html" class="mini-btn secondary">Sign In</a>
+        <a href="signup.html" class="mini-btn secondary">Create Account</a>
+      </div>
+    </div>
+
+    <div class="leaderboard-panel">
+      <div class="panel-header leaderboard-header">
+        <div>
+          <p class="eyebrow">Hall of fame</p>
+          <h3>Top operatives</h3>
+        </div>
+        <span class="live-badge">Live board</span>
+      </div>
+
+      <div id="leaderboard-status" class="leaderboard-status">Loading leaderboard...</div>
+      <div id="leaderboard-list" class="leaderboard-list"></div>
     </div>
 
     <div class="info-grid">
@@ -244,8 +517,125 @@ c<!DOCTYPE html>
     <p>© 2026 Cube Assault. Built with Three.js and Cloudflare Workers.</p>
   </div>
 
+  <button id="audio-toggle" class="audio-toggle" type="button" aria-label="Toggle background music">Music: On</button>
+
   <script>
-    // Generate random stars
+    const storageKey = 'cube_assault_account';
+    const accountTitle = document.getElementById('account-title');
+    const accountUsername = document.getElementById('account-username');
+    const accountEmail = document.getElementById('account-email');
+    const accountScore = document.getElementById('account-score');
+    const accountStatus = document.getElementById('account-status');
+    const accountMessage = document.getElementById('account-message');
+    const leaderboardStatus = document.getElementById('leaderboard-status');
+    const leaderboardList = document.getElementById('leaderboard-list');
+    const logoutBtn = document.getElementById('logout-btn');
+    const loginLink = document.getElementById('login-link');
+    const audioToggle = document.getElementById('audio-toggle');
+    const backgroundMusic = new Audio('backgroundmusic.mp3');
+    backgroundMusic.loop = true;
+    backgroundMusic.volume = 0.45;
+
+    let musicEnabled = true;
+
+    function toggleMusic() {
+      musicEnabled = !musicEnabled;
+      if (musicEnabled) {
+        backgroundMusic.play().catch(() => {});
+        audioToggle.textContent = 'Music: On';
+      } else {
+        backgroundMusic.pause();
+        audioToggle.textContent = 'Music: Off';
+      }
+    }
+
+    audioToggle.addEventListener('click', toggleMusic);
+    document.addEventListener('pointerdown', () => {
+      if (musicEnabled) {
+        backgroundMusic.play().catch(() => {});
+      }
+    }, { once: true });
+
+    function loadAccount() {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        accountTitle.textContent = 'No account detected';
+        accountUsername.textContent = 'Please sign in';
+        accountEmail.textContent = '-';
+        accountScore.textContent = '0';
+        accountStatus.textContent = 'Offline';
+        accountMessage.textContent = 'Create an account or log in to sync your profile and leaderboard score.';
+        if (loginLink) loginLink.textContent = 'LOG IN';
+        return null;
+      }
+
+      try {
+        const account = JSON.parse(raw);
+        accountTitle.textContent = `${account.username || 'Operator'}'s profile`;
+        accountUsername.textContent = account.username || 'Unknown';
+        accountEmail.textContent = account.email || 'No email registered';
+        accountScore.textContent = `${account.score || 0}`;
+        accountStatus.textContent = 'Online';
+        accountMessage.textContent = 'Welcome back, operator. Your profile is synced and ready.';
+        if (loginLink) loginLink.textContent = 'VIEW ACCOUNT';
+        return account;
+      } catch (error) {
+        accountMessage.textContent = 'Saved account data is invalid. Please log in again.';
+        return null;
+      }
+    }
+
+    async function loadLeaderboard() {
+      try {
+        const response = await fetch('/api/leaderboard');
+        const result = await response.json();
+
+        if (!response.ok || !Array.isArray(result.entries)) {
+          leaderboardStatus.textContent = 'Leaderboard unavailable right now.';
+          return;
+        }
+
+        leaderboardList.innerHTML = '';
+        if (!result.entries.length) {
+          leaderboardStatus.textContent = 'No scores recorded yet — be the first to climb the chart.';
+          return;
+        }
+
+        leaderboardStatus.textContent = 'Top operators by high score';
+        result.entries.forEach((entry, index) => {
+          const row = document.createElement('div');
+          row.className = 'leaderboard-row';
+          const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '◆';
+          const label = index === 0 ? 'Commander' : index === 1 ? 'Specialist' : index === 2 ? 'Rogue' : 'Operative';
+
+          row.innerHTML = `
+            <div class="leaderboard-player">
+              <span class="medal">${medal}</span>
+              <div>
+                <strong>${entry.username}</strong>
+                <small>${label}</small>
+              </div>
+            </div>
+            <span class="score-pill">${entry.score}</span>
+          `;
+          leaderboardList.appendChild(row);
+        });
+      } catch (error) {
+        leaderboardStatus.textContent = 'Leaderboard unavailable right now.';
+      }
+    }
+
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem(storageKey);
+      accountTitle.textContent = 'No account detected';
+      accountUsername.textContent = 'Please sign in';
+      accountEmail.textContent = '-';
+      accountScore.textContent = '0';
+      accountStatus.textContent = 'Offline';
+      accountMessage.textContent = 'You have been logged out. Sign in again to continue.';
+      if (loginLink) loginLink.textContent = 'LOG IN';
+    });
+
     const starfield = document.getElementById('starfield');
     for (let i = 0; i < 80; i++) {
       const star = document.createElement('div');
@@ -255,6 +645,9 @@ c<!DOCTYPE html>
       star.style.animationDelay = Math.random() * 3 + 's';
       starfield.appendChild(star);
     }
+
+    loadAccount();
+    loadLeaderboard();
   </script>
 </body>
 </html>

@@ -217,6 +217,13 @@ floor.receiveShadow = true;
 scene.add(floor);
 
 const walls = [];
+const boundaryMaterial = new THREE.MeshStandardMaterial({
+  color: 0x0d0d18,
+  emissive: 0x0d1d2d,
+  emissiveIntensity: 0.18,
+  roughness: 0.8,
+  metalness: 0.15,
+});
 const stoneMaterial = new THREE.MeshStandardMaterial({
   map: createNeonWallTexture(),
   emissive: 0x4900ff,
@@ -227,7 +234,7 @@ const stoneMaterial = new THREE.MeshStandardMaterial({
 });
 
 function addBlock(x, z, width, height, depth) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), stoneMaterial);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), boundaryMaterial);
   mesh.position.set(x, height / 2 - 0.5, z);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
