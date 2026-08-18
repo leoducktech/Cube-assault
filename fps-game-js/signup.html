@@ -123,6 +123,28 @@
           <script>
             const signupForm = document.getElementById('signup-form');
             const signupMessage = document.getElementById('signup-message');
+            const apiBase = (() => {
+              const { hostname, port, protocol } = window.location;
+              if (protocol === 'file:') return 'http://127.0.0.1:8787';
+              if (hostname === '127.0.0.1' || hostname === 'localhost') {
+                if (port === '8787') return '';
+                return 'http://127.0.0.1:8787';
+              }
+              return '';
+            })();
+
+            function readLocalAccounts() {
+              try {
+                const accounts = JSON.parse(localStorage.getItem('cube_assault_local_accounts') || '[]');
+                return Array.isArray(accounts) ? accounts : [];
+              } catch (error) {
+                return [];
+              }
+            }
+
+            function writeLocalAccounts(accounts) {
+              localStorage.setItem('cube_assault_local_accounts', JSON.stringify(accounts));
+            }
 
             signupForm.addEventListener('submit', async (event) => {
               event.preventDefault();
@@ -131,13 +153,25 @@
 
               const formData = new FormData(signupForm);
               const payload = {
-                username: formData.get('username'),
-                email: formData.get('email'),
-                password: formData.get('password'),
-                confirmPassword: formData.get('confirmPassword'),
+                username: String(formData.get('username') || '').trim(),
+                email: String(formData.get('email') || '').trim().toLowerCase(),
+                password: String(formData.get('password') || ''),
+                confirmPassword: String(formData.get('confirmPassword') || ''),
               };
 
-              const apiUrl = '/api/signup';
+              if (!payload.username || !payload.email || !payload.password || !payload.confirmPassword) {
+                signupMessage.textContent = 'All fields are required.';
+                signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                return;
+              }
+
+              if (payload.password !== payload.confirmPassword) {
+                signupMessage.textContent = 'Passwords do not match.';
+                signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                return;
+              }
+
+              const apiUrl = `${apiBase}/api/signup`;
 
               try {
                 const response = await fetch(apiUrl, {
@@ -145,9 +179,33 @@
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(payload),
                 });
-                const result = await response.json();
+
+                const result = await response.json().catch(() => ({}));
 
                 if (!response.ok) {
+                  const isServerIssue = response.status >= 500 || response.status === 404;
+                  if (isServerIssue) {
+                    const localAccounts = readLocalAccounts();
+                    const duplicate = localAccounts.some((account) => account.username === payload.username || account.email === payload.email);
+
+                    if (!duplicate) {
+                      localAccounts.push({
+                        username: payload.username,
+                        email: payload.email,
+                        password: payload.password,
+                      });
+                      writeLocalAccounts(localAccounts);
+                      localStorage.setItem('cube_assault_account', JSON.stringify({
+                        username: payload.username,
+                        email: payload.email,
+                      }));
+                      signupMessage.textContent = 'Account created locally. Redirecting...';
+                      signupMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
+                      setTimeout(() => window.location.href = 'account.html', 1000);
+                      return;
+                    }
+                  }
+
                   signupMessage.textContent = result.error || 'Unable to create your account.';
                   signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
                   return;
@@ -160,9 +218,32 @@
                   email: payload.email,
                 }));
                 setTimeout(() => window.location.href = 'account.html', 1000);
+                return;
               } catch (error) {
-                signupMessage.textContent = 'Network error. Please try again.';
-                signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                const localAccounts = readLocalAccounts();
+                const duplicate = localAccounts.some((account) => account.username === payload.username || account.email === payload.email);
+
+                if (duplicate) {
+                  signupMessage.textContent = 'Username or email already in use.';
+                  signupMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                  return;
+                }
+
+                localAccounts.push({
+                  username: payload.username,
+                  email: payload.email,
+                  password: payload.password,
+                });
+                writeLocalAccounts(localAccounts);
+
+                localStorage.setItem('cube_assault_account', JSON.stringify({
+                  username: payload.username,
+                  email: payload.email,
+                }));
+
+                signupMessage.textContent = 'Account created locally. Redirecting...';
+                signupMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
+                setTimeout(() => window.location.href = 'account.html', 1000);
               }
             });
           </script>

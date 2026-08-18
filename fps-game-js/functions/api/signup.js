@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: 'Username and password are required.' }, 400);
     }
 
-    await ensureScoreColumn(env);
+    await ensureUserTable(env);
 
     const account = await env.DB.prepare(
       'SELECT username, email, password, score FROM users WHERE username = ? LIMIT 1'
@@ -50,7 +50,7 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: 'Username is required.' }, 400);
     }
 
-    await ensureScoreColumn(env);
+    await ensureUserTable(env);
     await env.DB.prepare(
       'UPDATE users SET score = MAX(COALESCE(score, 0), ?) WHERE username = ?'
     )
@@ -62,7 +62,7 @@ export async function onRequestPost(context) {
   }
 
   if (pathname === '/api/leaderboard') {
-    await ensureScoreColumn(env);
+    await ensureUserTable(env);
     const entries = await env.DB.prepare(
       'SELECT username, score FROM users WHERE score IS NOT NULL ORDER BY score DESC LIMIT 10'
     ).all();
@@ -86,7 +86,7 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, error: 'Passwords do not match.' }, 400);
   }
 
-  await ensureScoreColumn(env);
+  await ensureUserTable(env);
 
   const existing = await env.DB.prepare(
     'SELECT username FROM users WHERE username = ? OR email = ? LIMIT 1'
@@ -109,7 +109,21 @@ export async function onRequestPost(context) {
   return jsonResponse({ success: true, message: 'Account created successfully.' }, 201);
 }
 
-async function ensureScoreColumn(env) {
+async function ensureUserTable(env) {
+  try {
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        score INTEGER DEFAULT 0
+      )
+    `).run();
+  } catch {
+    // Ignore if the table already exists or the database is temporarily unavailable.
+  }
+
   try {
     await env.DB.prepare('ALTER TABLE users ADD COLUMN score INTEGER DEFAULT 0').run();
   } catch {

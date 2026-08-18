@@ -24,6 +24,53 @@ const gameOverHint = document.getElementById('gameOverHint');
 const restartButton = document.getElementById('restartButton');
 const homeButton = document.getElementById('homeButton');
 const accountStorageKey = 'cube_assault_account';
+const CUBOTICS_PER_SCORE = 100;
+
+function formatCubotics(value) {
+  const numeric = Number(value) || 0;
+  const cubotics = numeric / CUBOTICS_PER_SCORE;
+  return Number.isInteger(cubotics) ? cubotics.toString() : cubotics.toFixed(1);
+}
+
+const musicToggle = document.createElement('button');
+musicToggle.id = 'musicToggle';
+musicToggle.type = 'button';
+musicToggle.textContent = '🔊 ON';
+document.body.appendChild(musicToggle);
+
+const backgroundMusic = new Audio('backgroundmusic.mp3');
+backgroundMusic.loop = true;
+backgroundMusic.volume = 0.45;
+let backgroundMusicStarted = false;
+let musicEnabled = true;
+
+function startBackgroundMusic() {
+  if (!musicEnabled || backgroundMusicStarted) return;
+  backgroundMusicStarted = true;
+  backgroundMusic.play().catch(() => {});
+}
+
+function setMusicState(enabled) {
+  musicEnabled = enabled;
+  musicToggle.textContent = enabled ? '🔊 ON' : '🔇 OFF';
+  musicToggle.classList.toggle('enabled', enabled);
+  musicToggle.classList.toggle('disabled', !enabled);
+  if (enabled) {
+    backgroundMusic.play().catch(() => {});
+  } else {
+    backgroundMusic.pause();
+    backgroundMusic.currentTime = 0;
+  }
+}
+
+musicToggle.classList.add('enabled');
+
+musicToggle.addEventListener('click', () => {
+  setMusicState(!musicEnabled);
+});
+
+window.addEventListener('pointerdown', startBackgroundMusic, { once: true });
+window.addEventListener('keydown', startBackgroundMusic, { once: true });
 
 restartButton.addEventListener('click', (event) => {
   event.stopPropagation();
@@ -51,11 +98,11 @@ function showGameOverScreen(finalScore) {
   overlayIntro?.classList.add('hidden');
   instructions?.classList.add('hidden');
   gameOverPanel?.classList.remove('hidden');
-  finalScoreText.textContent = `Final Score: ${finalScore}`;
-  gameOverHint.textContent = finalScore >= 500 ? 'You pushed the arena to its limits.' : 'The arena claimed your run.';
+  finalScoreText.textContent = `Final Cubotics: ${formatCubotics(finalScore)}`;
+  gameOverHint.textContent = finalScore >= 500 ? 'You pushed the arena to its limits. 1 Cubotics = 100 score.' : 'The arena claimed your run. 1 Cubotics = 100 score.';
   restartButton.style.display = 'inline-block';
   homeButton.style.display = 'inline-block';
-  status.textContent = `Status: mission failed — score ${finalScore}`;
+  status.textContent = `Status: mission failed — ${formatCubotics(finalScore)} Cubotics`;
 }
 
 function getStoredAccount() {
@@ -66,6 +113,16 @@ function getStoredAccount() {
   }
 }
 
+const apiBase = (() => {
+  const { hostname, port, protocol } = window.location;
+  if (protocol === 'file:') return 'http://127.0.0.1:8787';
+  if (hostname === '127.0.0.1' || hostname === 'localhost') {
+    if (port === '8787') return '';
+    return 'http://127.0.0.1:8787';
+  }
+  return '';
+})();
+
 async function persistScore(finalScore) {
   const account = getStoredAccount();
   if (!account?.username) return;
@@ -74,7 +131,7 @@ async function persistScore(finalScore) {
   localStorage.setItem(accountStorageKey, JSON.stringify(updatedAccount));
 
   try {
-    const response = await fetch('/api/update-score', {
+    const response = await fetch(`${apiBase}/api/update-score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: account.username, score: finalScore }),
@@ -434,7 +491,7 @@ function updateGameUI() {
 
   roundDisplay.textContent = `Round: ${currentRound}`;
   enemiesDisplay.textContent = `Enemies: ${enemiesRemaining}`;
-  scoreDisplay.textContent = `Score: ${score}`;
+  scoreDisplay.textContent = `Cubotics: ${formatCubotics(score)}`;
   goldDisplay.textContent = `Gold: ${goldCount}`;
   playerHealthDisplay.textContent = `HP: ${player.health}/${player.maxHealth}`;
   const healthPercent = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
@@ -588,6 +645,10 @@ function startNextWave() {
     status.textContent = `Endless mode: Round ${currentRound}`;
   }
 
+  const necromancerChance = currentRound <= 4 ? 0.25 : 0.5;
+  const shouldSpawnNecromancer = Math.random() < necromancerChance;
+  let necromancerSpawned = false;
+
   enemiesRemaining = wave.numEnemies;
   waveActive = true;
   console.log(`Starting Wave ${currentRound} with ${wave.numEnemies} enemies.`);
@@ -600,6 +661,9 @@ function startNextWave() {
     let enemyType = 'normal';
     if (isBossRound) {
       enemyType = 'boss';
+    } else if (shouldSpawnNecromancer && !necromancerSpawned && i === 0) {
+      enemyType = 'necromancer';
+      necromancerSpawned = true;
     } else if (i % 5 === 0) {
       enemyType = 'heavy';
     } else if (i % 5 === 2) {
@@ -820,6 +884,23 @@ function getEnemyVariantConfig(type, color, emissiveColor) {
         healthMultiplier: 0.7,
         speedMultiplier: 1.25,
       };
+    case 'necromancer':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(0.95, 1.1, 0.95),
+        bodyColor: 0x3f2a68,
+        bodyEmissive: 0x2d0949,
+        bodyEmissiveIntensity: 0.8,
+        armGeometry: new THREE.BoxGeometry(0.22, 0.72, 0.22),
+        armColor: 0x4f3b7d,
+        armEmissive: 0x2d0949,
+        armEmissiveIntensity: 0.5,
+        legGeometry: new THREE.BoxGeometry(0.28, 0.8, 0.28),
+        legColor: 0x20182d,
+        eyeColor: 0xf4d7ff,
+        scaleMultiplier: 1,
+        healthMultiplier: 1.5,
+        speedMultiplier: 0.9,
+      };
     case 'boss':
       return {
         bodyGeometry: new THREE.BoxGeometry(1, 1, 1),
@@ -1011,35 +1092,57 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
     emissiveIntensity: variant.armEmissiveIntensity || 0,
   });
   const leftArm = new THREE.Mesh(variant.armGeometry, armMat);
-  leftArm.position.set(type === 'heavy' ? -0.75 : type === 'light' ? -0.5 : -0.65, 0, 0);
+  leftArm.position.set(type === 'heavy' ? -0.75 : type === 'light' ? -0.5 : type === 'necromancer' ? -0.55 : -0.65, 0, 0);
   leftArm.castShadow = true;
   group.add(leftArm);
   const rightArm = new THREE.Mesh(variant.armGeometry, armMat);
-  rightArm.position.set(type === 'heavy' ? 0.75 : type === 'light' ? 0.5 : 0.65, 0, 0);
+  rightArm.position.set(type === 'heavy' ? 0.75 : type === 'light' ? 0.5 : type === 'necromancer' ? 0.55 : 0.65, 0, 0);
   rightArm.castShadow = true;
   group.add(rightArm);
 
   // Legs
   const legMat = new THREE.MeshStandardMaterial({ color: variant.legColor });
   const leftLeg = new THREE.Mesh(variant.legGeometry, legMat);
-  leftLeg.position.set(type === 'heavy' ? -0.35 : type === 'light' ? -0.2 : -0.3, -0.9, 0);
+  leftLeg.position.set(type === 'heavy' ? -0.35 : type === 'light' ? -0.2 : type === 'necromancer' ? -0.26 : -0.3, -0.9, 0);
   leftLeg.castShadow = true;
   group.add(leftLeg);
   const rightLeg = new THREE.Mesh(variant.legGeometry, legMat);
-  rightLeg.position.set(type === 'heavy' ? 0.35 : type === 'light' ? 0.2 : 0.3, -0.9, 0);
+  rightLeg.position.set(type === 'heavy' ? 0.35 : type === 'light' ? 0.2 : type === 'necromancer' ? 0.26 : 0.3, -0.9, 0);
   rightLeg.castShadow = true;
   group.add(rightLeg);
+
+  if (type === 'necromancer') {
+    const staffGroup = new THREE.Group();
+    const staffMat = new THREE.MeshStandardMaterial({ color: 0x8b7ad9, emissive: 0x371a65, emissiveIntensity: 0.5 });
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.8, 10), staffMat);
+    staff.rotation.z = Math.PI / 2 * 0.12;
+    staff.position.set(0.7, 0.25, 0.1);
+    staffGroup.add(staff);
+
+    const gemMat = new THREE.MeshStandardMaterial({ color: 0xff9bf0, emissive: 0xff4ed8, emissiveIntensity: 1.2 });
+    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), gemMat);
+    gem.position.set(0.7, 1.3, 0.1);
+    staffGroup.add(gem);
+
+    const rune = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.04, 8, 20), new THREE.MeshBasicMaterial({ color: 0xff8af1, transparent: true, opacity: 0.8 }));
+    rune.rotation.x = Math.PI / 2;
+    rune.position.set(0.7, 1.3, 0.1);
+    staffGroup.add(rune);
+    staffGroup.userData.rune = rune;
+    group.add(staffGroup);
+    group.userData.staff = staffGroup;
+  }
 
   // Face
   const eyeGeo = new THREE.BoxGeometry(0.2, 0.2, 0.1);
   const eyeMat = new THREE.MeshStandardMaterial({ color: variant.eyeColor });
   const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-  leftEye.position.set(type === 'light' ? -0.18 : -0.25, 0.2, 0.51);
+  leftEye.position.set(type === 'light' ? -0.18 : type === 'necromancer' ? -0.2 : -0.25, 0.2, 0.51);
   group.add(leftEye);
   const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-  rightEye.position.set(type === 'light' ? 0.18 : 0.25, 0.2, 0.51);
+  rightEye.position.set(type === 'light' ? 0.18 : type === 'necromancer' ? 0.2 : 0.25, 0.2, 0.51);
   group.add(rightEye);
-  const mouthGeo = new THREE.BoxGeometry(type === 'light' ? 0.34 : 0.5, 0.1, 0.1);
+  const mouthGeo = new THREE.BoxGeometry(type === 'light' ? 0.34 : type === 'necromancer' ? 0.42 : 0.5, 0.1, 0.1);
   const mouth = new THREE.Mesh(mouthGeo, eyeMat);
   mouth.position.set(0, -0.25, 0.51);
   group.add(mouth);
@@ -1077,6 +1180,10 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   group.userData.rightLeg = rightLeg;
   group.userData.emissiveColor = emissiveColor;
   group.userData.emissiveOrigIntensity = bodyMat.emissiveIntensity || 0;
+  group.userData.summonTriggered = false;
+  group.userData.summonTimer = 0;
+  group.userData.summonCooldown = 0;
+  group.userData.projectileCooldown = 1.2;
 
   createEnemyScars(group);
   updateEnemyScars(group);
@@ -1120,6 +1227,93 @@ function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss') 
 
   scene.add(projectile);
   projectiles.push(projectile);
+}
+
+function summonNecromancerMinions(enemy) {
+  if (!enemy || enemy.userData.summonTriggered) return;
+
+  enemy.userData.summonTriggered = true;
+  enemy.userData.summonTimer = 1.5;
+  enemy.userData.projectileCooldown = 1.2;
+
+  const summonRing = new THREE.Mesh(
+    new THREE.TorusGeometry(1.2, 0.08, 10, 36),
+    new THREE.MeshBasicMaterial({ color: 0xff9bf0, transparent: true, opacity: 0.9 })
+  );
+  summonRing.rotation.x = Math.PI / 2;
+  summonRing.position.set(enemy.position.x, 0.7, enemy.position.z);
+  summonRing.userData.life = 1.5;
+  scene.add(summonRing);
+  enemy.userData.summonRing = summonRing;
+
+  const summonPositions = [
+    { x: -1.8, z: -1.2 },
+    { x: 1.8, z: 1.2 },
+  ];
+
+  summonPositions.forEach((offset) => {
+    const spawnX = enemy.position.x + offset.x;
+    const spawnZ = enemy.position.z + offset.z;
+    const lightEnemy = createEnemy(spawnX, spawnZ, 60, 3.8, 0x7edbff, 0.82, 0x0e2c47, 'light');
+    lightEnemy.userData.isSummoned = true;
+    lightEnemy.userData.summoner = enemy;
+    lightEnemy.userData.originSpawn = true;
+  });
+}
+
+function updateNecromancer(enemy, delta) {
+  if (enemy.userData.variant !== 'necromancer') return;
+
+  const staff = enemy.userData.staff;
+  if (staff) {
+    staff.rotation.y += delta * 1.4;
+    if (staff.userData.rune) {
+      staff.userData.rune.rotation.z += delta * 4.5;
+    }
+  }
+
+  if (enemy.userData.summonRing) {
+    const ring = enemy.userData.summonRing;
+    ring.userData.life -= delta;
+    const progress = Math.max(0, ring.userData.life / 1.5);
+    const currentScale = 1 + (1 - progress) * 1.8;
+    ring.scale.setScalar(currentScale);
+    ring.material.opacity = Math.max(0, progress * 0.9);
+    if (ring.userData.life <= 0) {
+      scene.remove(ring);
+      enemy.userData.summonRing = null;
+    }
+  }
+
+  if (!enemy.userData.summonTriggered && enemy.position.distanceTo(player.position) < 18) {
+    summonNecromancerMinions(enemy);
+  }
+
+  if (enemy.userData.summonTriggered) {
+    enemy.userData.summonTimer = Math.max(0, (enemy.userData.summonTimer || 0) - delta);
+    enemy.userData.projectileCooldown = Math.max(0, (enemy.userData.projectileCooldown || 1.2) - delta);
+
+    if (enemy.userData.projectileCooldown <= 0) {
+      const dir = new THREE.Vector3().subVectors(player.position, enemy.position);
+      dir.y = 0;
+      if (dir.lengthSq() > 0.0001) dir.normalize();
+      const projectilePos = enemy.position.clone().addScaledVector(dir, 1.1);
+      projectilePos.y += 1.2;
+      const projectile = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.42, 0.42),
+        new THREE.MeshStandardMaterial({ color: 0xff6fe8, emissive: 0xff4ccf, emissiveIntensity: 1.3 })
+      );
+      projectile.position.copy(projectilePos);
+      projectile.userData.velocity = dir.clone().multiplyScalar(8.5);
+      projectile.userData.life = 4.5;
+      projectile.userData.damage = 12;
+      projectile.userData.reflected = false;
+      projectile.userData.variant = 'necromancer';
+      scene.add(projectile);
+      projectiles.push(projectile);
+      enemy.userData.projectileCooldown = 1.6 + Math.random() * 0.8;
+    }
+  }
 }
 
 function updateEnemyHealthBar(enemy) {
@@ -1203,6 +1397,7 @@ function damagePlayer(amount) {
 function resetGame() {
   gameOver = false;
   restartButton.style.display = 'none';
+  applySelectedPerk();
   // Clear enemies from scene and array
   enemies.forEach(enemy => {
     scene.remove(enemy);
@@ -1271,6 +1466,46 @@ const player = {
   attackDamage: 34,
   damageCooldown: 0, // Cooldown for taking damage from enemies
 };
+
+const perkModifiers = {
+  fortified: { maxHealthBoost: 20 },
+  swift: { speedBoost: 1 },
+  impact: { damageBoost: 10 },
+  aegis: { maxHealthBoost: 35 },
+  storm: { speedBoost: 2, jumpBoost: 2 },
+  overdrive: { damageBoost: 18 },
+};
+
+function getPurchasedPerks() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('cube_assault_purchased_perks') || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function applySelectedPerk() {
+  const purchased = new Set(getPurchasedPerks());
+  const perkId = localStorage.getItem('cube_assault_perk');
+
+  if (!perkId || !purchased.has(perkId)) {
+    localStorage.removeItem('cube_assault_perk');
+    player.maxHealth = 100;
+    player.speed = 8;
+    player.attackDamage = 34;
+    player.jumpSpeed = 8;
+    player.health = player.maxHealth;
+    return;
+  }
+
+  const mod = perkModifiers[perkId] || { };
+  player.maxHealth = 100 + (mod.maxHealthBoost || 0);
+  player.speed = 8 + (mod.speedBoost || 0);
+  player.attackDamage = 34 + (mod.damageBoost || 0);
+  player.jumpSpeed = 8 + (mod.jumpBoost || 0);
+  player.health = player.maxHealth;
+}
 
 camera.position.copy(player.position);
 camera.rotation.order = 'YXZ';
@@ -1632,6 +1867,10 @@ function animate() {
         }
         enemy.userData.shootTimer = 1.5 + Math.random();
       }
+    }
+
+    if (enemy.userData.variant === 'necromancer') {
+      updateNecromancer(enemy, delta);
     }
 
     // Update the visual helper as the enemy moves

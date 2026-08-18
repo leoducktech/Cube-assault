@@ -13,7 +13,7 @@ c<!DOCTYPE html>
     }
     html, body {
       width: 100%;
-      height: 100%;
+      min-height: 100%;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: radial-gradient(circle at top, #1a0f35 0%, #050113 38%, #000000 100%);
       color: #d3f8ff;
@@ -45,12 +45,12 @@ c<!DOCTYPE html>
       position: relative;
       z-index: 1;
       width: 100%;
-      height: 100%;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
-      padding: 40px 20px;
+      padding: 40px 20px 80px;
     }
     .glow-grid {
       position: fixed;
@@ -272,6 +272,78 @@ c<!DOCTYPE html>
       background: rgba(167, 139, 250, 0.08);
       color: #ddd6fe;
     }
+    .perk-panel {
+      width: min(1100px, 100%);
+      margin: 0 auto 36px;
+      padding: 22px 18px 18px;
+    }
+    .perk-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .perk-item {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .perk-item h4 {
+      font-size: 1.05rem;
+      color: #f8fafc;
+      margin: 0;
+    }
+    .perk-item p {
+      color: #cfe8ff;
+      font-size: 0.86rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .perk-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .perk-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(103, 232, 249, 0.1);
+      border: 1px solid rgba(103, 232, 249, 0.26);
+      color: #dff7ff;
+      font-weight: 700;
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .perk-select {
+      border: 1px solid rgba(96, 165, 250, 0.28);
+      background: rgba(59, 130, 246, 0.08);
+      color: #dbeafe;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .perk-select:hover {
+      transform: translateY(-1px);
+      background: rgba(59, 130, 246, 0.16);
+    }
+    .perk-select.selected {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(74, 222, 128, 0.42);
+      color: #dcfce7;
+    }
     .leaderboard-panel {
       width: min(1100px, 100%);
       margin: 0 auto 36px;
@@ -375,30 +447,13 @@ c<!DOCTYPE html>
       font-size: 0.95rem;
     }
     .footer {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
+      position: relative;
+      margin-top: 24px;
       font-size: 0.85rem;
       color: #668ad8;
       text-align: center;
       z-index: 2;
-    }
-    .audio-toggle {
-      position: fixed;
-      right: 22px;
-      bottom: 22px;
-      z-index: 3;
-      border: 1px solid rgba(125, 211, 252, 0.5);
-      background: rgba(15, 23, 42, 0.78);
-      color: #dff7ff;
-      padding: 10px 14px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      cursor: pointer;
-      box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+      padding-bottom: 8px;
     }
     @media (max-width: 768px) {
       .container {
@@ -465,8 +520,9 @@ c<!DOCTYPE html>
             <strong id="account-email">-</strong>
           </div>
           <div class="stat-box">
-            <span class="label">Score</span>
+            <span class="label">Cubotics</span>
             <strong id="account-score">0</strong>
+            <small style="display:block;margin-top:8px;color:#93c5fd;letter-spacing:0.08em;text-transform:uppercase;">1 Cubotics = 100 Score</small>
           </div>
           <div class="stat-box">
             <span class="label">Status</span>
@@ -482,6 +538,18 @@ c<!DOCTYPE html>
         <a href="login.html" class="mini-btn secondary">Sign In</a>
         <a href="signup.html" class="mini-btn secondary">Create Account</a>
       </div>
+    </div>
+
+    <div class="perk-panel">
+      <div class="panel-header leaderboard-header">
+        <div>
+          <p class="eyebrow">Operator build</p>
+          <h3>Perks</h3>
+        </div>
+        <span class="live-badge">Arena ready</span>
+      </div>
+
+      <div id="perk-items" class="perk-grid"></div>
     </div>
 
     <div class="leaderboard-panel">
@@ -513,12 +581,6 @@ c<!DOCTYPE html>
     </div>
   </div>
 
-  <div class="footer">
-    <p>© 2026 Cube Assault. Built with Three.js and Cloudflare Workers.</p>
-  </div>
-
-  <button id="audio-toggle" class="audio-toggle" type="button" aria-label="Toggle background music">Music: On</button>
-
   <script>
     const storageKey = 'cube_assault_account';
     const accountTitle = document.getElementById('account-title');
@@ -529,32 +591,76 @@ c<!DOCTYPE html>
     const accountMessage = document.getElementById('account-message');
     const leaderboardStatus = document.getElementById('leaderboard-status');
     const leaderboardList = document.getElementById('leaderboard-list');
+    const perkItemsEl = document.getElementById('perk-items');
     const logoutBtn = document.getElementById('logout-btn');
     const loginLink = document.getElementById('login-link');
-    const audioToggle = document.getElementById('audio-toggle');
-    const backgroundMusic = new Audio('backgroundmusic.mp3');
-    backgroundMusic.loop = true;
-    backgroundMusic.volume = 0.45;
+    const purchasedPerksKey = 'cube_assault_purchased_perks';
 
-    let musicEnabled = true;
+    const perkItems = [
+      { id: 'fortified', name: 'Fortified Frame', tag: 'Survival', description: 'Boosts max health and keeps you standing longer in a difficult run.' },
+      { id: 'swift', name: 'Swift Step', tag: 'Mobility', description: 'Improves movement speed for safer repositioning and faster escapes.' },
+      { id: 'impact', name: 'Impact Rounds', tag: 'Offense', description: 'Raises damage output so heavy targets fall faster.' },
+      { id: 'aegis', name: 'Aegis Guard', tag: 'Defense', description: 'Adds extra armor to improve survivability against incoming damage.' },
+      { id: 'storm', name: 'Storm Sprint', tag: 'Mobility', description: 'Increases your movement and jump speed for aggressive positioning.' },
+      { id: 'overdrive', name: 'Overdrive Core', tag: 'Offense', description: 'Cranks up attack power so every hit lands harder and faster.' }
+    ];
 
-    function toggleMusic() {
-      musicEnabled = !musicEnabled;
-      if (musicEnabled) {
-        backgroundMusic.play().catch(() => {});
-        audioToggle.textContent = 'Music: On';
-      } else {
-        backgroundMusic.pause();
-        audioToggle.textContent = 'Music: Off';
+    function getPurchasedPerks() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(purchasedPerksKey) || '[]');
+        return Array.isArray(raw) ? raw : [];
+      } catch (error) {
+        return [];
       }
     }
 
-    audioToggle.addEventListener('click', toggleMusic);
-    document.addEventListener('pointerdown', () => {
-      if (musicEnabled) {
-        backgroundMusic.play().catch(() => {});
+    function renderPerks() {
+      const purchased = new Set(getPurchasedPerks());
+      const saved = localStorage.getItem('cube_assault_perk');
+      const selected = purchased.has(saved) ? saved : null;
+
+      if (!selected && saved) {
+        localStorage.removeItem('cube_assault_perk');
       }
-    }, { once: true });
+
+      perkItemsEl.innerHTML = '';
+
+      perkItems.forEach((item) => {
+        const card = document.createElement('div');
+        card.className = 'perk-item';
+        const isPurchased = purchased.has(item.id);
+        const isSelected = selected === item.id;
+
+        card.innerHTML = `
+          <h4>${item.name}</h4>
+          <p>${item.description}</p>
+          <div class="perk-meta">
+            <span class="perk-badge">${item.tag}</span>
+            <button class="perk-select ${isSelected ? 'selected' : ''}">
+              ${isPurchased ? (isSelected ? 'Equipped' : 'Equip') : 'Purchase'}
+            </button>
+          </div>
+        `;
+
+        card.querySelector('.perk-select').addEventListener('click', () => {
+          if (!isPurchased) {
+            const nextPurchased = [...purchased];
+            if (!nextPurchased.includes(item.id)) {
+              nextPurchased.push(item.id);
+              localStorage.setItem(purchasedPerksKey, JSON.stringify(nextPurchased));
+            }
+            localStorage.setItem('cube_assault_perk', item.id);
+            renderPerks();
+            return;
+          }
+
+          localStorage.setItem('cube_assault_perk', item.id);
+          renderPerks();
+        });
+
+        perkItemsEl.appendChild(card);
+      });
+    }
 
     function loadAccount() {
       const raw = localStorage.getItem(storageKey);
@@ -564,7 +670,7 @@ c<!DOCTYPE html>
         accountEmail.textContent = '-';
         accountScore.textContent = '0';
         accountStatus.textContent = 'Offline';
-        accountMessage.textContent = 'Create an account or log in to sync your profile and leaderboard score.';
+        accountMessage.textContent = 'Create an account or log in to sync your profile and Cubotics balance.';
         if (loginLink) loginLink.textContent = 'LOG IN';
         return null;
       }
@@ -574,9 +680,10 @@ c<!DOCTYPE html>
         accountTitle.textContent = `${account.username || 'Operator'}'s profile`;
         accountUsername.textContent = account.username || 'Unknown';
         accountEmail.textContent = account.email || 'No email registered';
-        accountScore.textContent = `${account.score || 0}`;
+        const cuboticsValue = Number(account.score || 0) / 100;
+        accountScore.textContent = Number.isInteger(cuboticsValue) ? cuboticsValue.toString() : cuboticsValue.toFixed(1);
         accountStatus.textContent = 'Online';
-        accountMessage.textContent = 'Welcome back, operator. Your profile is synced and ready.';
+        accountMessage.textContent = 'Welcome back, operator. Your Cubotics are synced and ready.';
         if (loginLink) loginLink.textContent = 'VIEW ACCOUNT';
         return account;
       } catch (error) {
@@ -585,9 +692,19 @@ c<!DOCTYPE html>
       }
     }
 
+    const apiBase = (() => {
+      const { hostname, port, protocol } = window.location;
+      if (protocol === 'file:') return 'http://127.0.0.1:8787';
+      if (hostname === '127.0.0.1' || hostname === 'localhost') {
+        if (port === '8787') return '';
+        return 'http://127.0.0.1:8787';
+      }
+      return '';
+    })();
+
     async function loadLeaderboard() {
       try {
-        const response = await fetch('/api/leaderboard');
+        const response = await fetch(`${apiBase}/api/leaderboard`);
         const result = await response.json();
 
         if (!response.ok || !Array.isArray(result.entries)) {
@@ -597,17 +714,18 @@ c<!DOCTYPE html>
 
         leaderboardList.innerHTML = '';
         if (!result.entries.length) {
-          leaderboardStatus.textContent = 'No scores recorded yet — be the first to climb the chart.';
+          leaderboardStatus.textContent = 'No Cubotics recorded yet — be the first to climb the chart.';
           return;
         }
 
-        leaderboardStatus.textContent = 'Top operators by high score';
+        leaderboardStatus.textContent = 'Top operators by Cubotics';
         result.entries.forEach((entry, index) => {
           const row = document.createElement('div');
           row.className = 'leaderboard-row';
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '◆';
           const label = index === 0 ? 'Commander' : index === 1 ? 'Specialist' : index === 2 ? 'Rogue' : 'Operative';
 
+          const cuboticsDisplay = Number(entry.score || 0) / 100;
           row.innerHTML = `
             <div class="leaderboard-player">
               <span class="medal">${medal}</span>
@@ -616,7 +734,7 @@ c<!DOCTYPE html>
                 <small>${label}</small>
               </div>
             </div>
-            <span class="score-pill">${entry.score}</span>
+            <span class="score-pill">${Number.isInteger(cuboticsDisplay) ? cuboticsDisplay.toString() : cuboticsDisplay.toFixed(1)}</span>
           `;
           leaderboardList.appendChild(row);
         });
@@ -646,6 +764,7 @@ c<!DOCTYPE html>
       starfield.appendChild(star);
     }
 
+    renderPerks();
     loadAccount();
     loadLeaderboard();
   </script>

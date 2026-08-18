@@ -115,6 +115,24 @@
           <script>
             const loginForm = document.getElementById('login-form');
             const loginMessage = document.getElementById('login-message');
+            const apiBase = (() => {
+              const { hostname, port, protocol } = window.location;
+              if (protocol === 'file:') return 'http://127.0.0.1:8787';
+              if (hostname === '127.0.0.1' || hostname === 'localhost') {
+                if (port === '8787') return '';
+                return 'http://127.0.0.1:8787';
+              }
+              return '';
+            })();
+
+            function readLocalAccounts() {
+              try {
+                const accounts = JSON.parse(localStorage.getItem('cube_assault_local_accounts') || '[]');
+                return Array.isArray(accounts) ? accounts : [];
+              } catch (error) {
+                return [];
+              }
+            }
 
             loginForm.addEventListener('submit', async (event) => {
               event.preventDefault();
@@ -123,19 +141,36 @@
 
               const formData = new FormData(loginForm);
               const payload = {
-                username: formData.get('username'),
-                password: formData.get('password'),
+                username: String(formData.get('username') || '').trim(),
+                password: String(formData.get('password') || ''),
               };
 
               try {
-                const response = await fetch('/api/login', {
+                const response = await fetch(`${apiBase}/api/login`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(payload),
                 });
-                const result = await response.json();
+                const result = await response.json().catch(() => ({}));
 
                 if (!response.ok) {
+                  const isServerIssue = response.status >= 500 || response.status === 404;
+                  if (isServerIssue) {
+                    const localAccounts = readLocalAccounts();
+                    const localAccount = localAccounts.find((account) => account.username === payload.username && account.password === payload.password);
+
+                    if (localAccount) {
+                      loginMessage.textContent = 'Local login successful. Redirecting...';
+                      loginMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
+                      localStorage.setItem('cube_assault_account', JSON.stringify({
+                        username: payload.username,
+                        email: localAccount.email || '',
+                      }));
+                      setTimeout(() => window.location.href = 'account.html', 1000);
+                      return;
+                    }
+                  }
+
                   loginMessage.textContent = result.error || 'Login failed.';
                   loginMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
                   return;
@@ -148,9 +183,24 @@
                   email: result.email || '',
                 }));
                 setTimeout(() => window.location.href = 'account.html', 1000);
+                return;
               } catch (error) {
-                loginMessage.textContent = 'Network error. Please try again.';
-                loginMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                const localAccounts = readLocalAccounts();
+                const localAccount = localAccounts.find((account) => account.username === payload.username && account.password === payload.password);
+
+                if (!localAccount) {
+                  loginMessage.textContent = 'The login server is unavailable and no local account matches those credentials.';
+                  loginMessage.className = 'mt-4 text-sm font-semibold text-rose-400';
+                  return;
+                }
+
+                loginMessage.textContent = 'Local login successful. Redirecting...';
+                loginMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
+                localStorage.setItem('cube_assault_account', JSON.stringify({
+                  username: payload.username,
+                  email: localAccount.email || '',
+                }));
+                setTimeout(() => window.location.href = 'account.html', 1000);
               }
             });
           </script>

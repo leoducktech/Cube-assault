@@ -154,6 +154,54 @@ body::after {
   box-shadow: 0 0 30px rgba(68, 212, 255, 0.12);
   backdrop-filter: blur(10px);
 }
+#musicToggle {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 94px;
+  border: 1px solid rgba(103, 232, 249, 0.7);
+  background: rgba(9, 17, 32, 0.82);
+  color: #dff7ff;
+  padding: 9px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  box-shadow: 0 0 14px rgba(103, 232, 249, 0.18);
+}
+#musicToggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px rgba(103, 232, 249, 0.26);
+  border-color: rgba(125, 211, 252, 0.9);
+}
+#musicToggle:active {
+  transform: translateY(0);
+}
+#musicToggle.enabled {
+  background: rgba(13, 28, 46, 0.9);
+  border-color: rgba(103, 232, 249, 0.9);
+  animation: music-toggle-pulse 1.6s ease-in-out infinite;
+}
+#musicToggle.disabled {
+  background: rgba(29, 22, 34, 0.82);
+  border-color: rgba(255, 120, 120, 0.72);
+  color: #fbd5d5;
+}
+@keyframes music-toggle-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(103, 232, 249, 0.16);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(103, 232, 249, 0.34);
+  }
+}
 .hud-item {
   position: relative;
   padding: 12px 14px;
