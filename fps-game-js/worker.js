@@ -20,7 +20,7 @@ export default {
       }
 
       if (url.pathname === '/api/leaderboard' && request.method === 'GET') {
-        return await handleLeaderboard(env);
+        return await handleLeaderboard(request, env);
       }
 
       return new Response('Not found', {
@@ -65,7 +65,7 @@ async function handleSignup(request, env) {
 
   const passwordHash = await hashPassword(password);
 
-  await env.DB.prepare('INSERT INTO users (username, email, password, score) VALUES (?, ?, ?, 0)')
+  await env.DB.prepare('INSERT INTO users (username, email, password, score, Cubotics, NeonShards) VALUES (?, ?, ?, 0, 0, 0)')
     .bind(username, email, passwordHash)
     .run();
 
@@ -83,7 +83,7 @@ async function handleLogin(request, env) {
 
   await ensureUserTable(env);
 
-  const account = await env.DB.prepare('SELECT username, email, password, score FROM users WHERE username = ? LIMIT 1')
+  const account = await env.DB.prepare('SELECT username, email, password, Cubotics, NeonShards FROM users WHERE username = ? LIMIT 1')
     .bind(username)
     .first();
 
@@ -96,33 +96,46 @@ async function handleLogin(request, env) {
     return jsonResponse({ success: false, error: 'Incorrect password.' }, 401);
   }
 
-  return jsonResponse({ success: true, email: account.email, score: Number(account.score || 0) }, 200);
+  return jsonResponse({ success: true, email: account.email, cubotics: Number(account.Cubotics || 0), neonShards: Number(account.NeonShards || 0) }, 200);
 }
 
 async function handleUpdateScore(request, env) {
   const body = await request.json();
   const username = String(body.username || '').trim();
   const score = Number(body.score || 0);
+  const cubotics = typeof body.cubotics === 'number' ? Number(body.cubotics) : (Number(score) / 100);
+  const neonShards = Number(body.neonShards || 0);
 
   if (!username) {
     return jsonResponse({ success: false, error: 'Username is required.' }, 400);
   }
 
   await ensureUserTable(env);
-  await env.DB.prepare('UPDATE users SET score = MAX(COALESCE(score, 0), ?) WHERE username = ?')
-    .bind(score, username)
+  await env.DB.prepare('UPDATE users SET Cubotics = MAX(COALESCE(Cubotics, 0), ?) WHERE username = ?')
+    .bind(cubotics, username)
+    .run();
+  await env.DB.prepare('UPDATE users SET NeonShards = MAX(COALESCE(NeonShards, 0), ?) WHERE username = ?')
+    .bind(neonShards, username)
     .run();
 
-  const updated = await env.DB.prepare('SELECT score FROM users WHERE username = ? LIMIT 1').bind(username).first();
-  return jsonResponse({ success: true, score: Number(updated?.score || 0) }, 200);
+  const updated = await env.DB.prepare('SELECT Cubotics, NeonShards FROM users WHERE username = ? LIMIT 1').bind(username).first();
+  return jsonResponse({ success: true, cubotics: Number(updated?.Cubotics || 0), neonShards: Number(updated?.NeonShards || 0) }, 200);
 }
 
-async function handleLeaderboard(env) {
+async function handleLeaderboard(request, env) {
   await ensureUserTable(env);
-  const result = await env.DB.prepare('SELECT username, score FROM users WHERE score IS NOT NULL ORDER BY score DESC LIMIT 10').all();
-  return jsonResponse({ success: true, entries: (result.results || []).map((entry) => ({
+  const url = new URL(request.url);
+  const category = url.searchParams.get('category') || 'all-time';
+  const filters = {
+    'all-time': '1 = 1',
+    elite: 'COALESCE(Cubotics, 0) >= 100',
+    rising: 'COALESCE(Cubotics, 0) < 100',
+  };
+  const filter = filters[category] || filters['all-time'];
+  const result = await env.DB.prepare(`SELECT username, Cubotics FROM users WHERE ${filter} ORDER BY Cubotics DESC LIMIT 10`).all();
+  return jsonResponse({ success: true, category, entries: (result.results || []).map((entry) => ({
     username: entry.username,
-    score: Number(entry.score || 0),
+    cubotics: Number(entry.Cubotics || 0),
   })) }, 200);
 }
 
@@ -161,14 +174,16 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
 async function ensureUserTable(env) {
   try {
     await env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        score INTEGER DEFAULT 0
-      )
-    `).run();
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT UNIQUE NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          score INTEGER DEFAULT 0,
+          Cubotics INTEGER DEFAULT 0,
+          NeonShards INTEGER DEFAULT 0
+        )
+      `).run();
   } catch {
     // Ignore if the table already exists or the database is temporarily unavailable.
   }
@@ -178,4 +193,20 @@ async function ensureUserTable(env) {
   } catch {
     // Ignore if the column already exists.
   }
+
+  try {
+    await env.DB.prepare('ALTER TABLE users ADD COLUMN Cubotics INTEGER DEFAULT 0').run();
+  } catch {
+    // Ignore if the column already exists.
+  }
+
+  try {
+    await env.DB.prepare('ALTER TABLE users ADD COLUMN NeonShards INTEGER DEFAULT 0').run();
+  } catch {
+    // Ignore if the column already exists.
+  }
+
+  try {
+    await env.DB.prepare('UPDATE users SET Cubotics = CAST((COALESCE(score,0)/100.0) AS INTEGER) WHERE (Cubotics IS NULL OR Cubotics = 0) AND (score IS NOT NULL)').run();
+  } catch {}
 }

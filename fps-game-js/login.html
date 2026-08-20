@@ -165,6 +165,8 @@
                       localStorage.setItem('cube_assault_account', JSON.stringify({
                         username: payload.username,
                         email: localAccount.email || '',
+                        cubotics: Number(localAccount.cubotics || 0),
+                        neonShards: Number(localAccount.neonShards || 0),
                       }));
                       setTimeout(() => window.location.href = 'account.html', 1000);
                       return;
@@ -181,6 +183,8 @@
                 localStorage.setItem('cube_assault_account', JSON.stringify({
                   username: payload.username,
                   email: result.email || '',
+                  cubotics: Number(result.cubotics || 0),
+                  neonShards: Number(result.neonShards || 0),
                 }));
                 setTimeout(() => window.location.href = 'account.html', 1000);
                 return;
@@ -199,6 +203,8 @@
                 localStorage.setItem('cube_assault_account', JSON.stringify({
                   username: payload.username,
                   email: localAccount.email || '',
+                  cubotics: Number(localAccount.cubotics || 0),
+                  neonShards: Number(localAccount.neonShards || 0),
                 }));
                 setTimeout(() => window.location.href = 'account.html', 1000);
               }

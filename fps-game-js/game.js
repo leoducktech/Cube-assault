@@ -126,24 +126,26 @@ const apiBase = (() => {
 async function persistScore(finalScore) {
   const account = getStoredAccount();
   if (!account?.username) return;
-
-  const updatedAccount = { ...account, score: finalScore };
+  // Convert raw score to Cubotics units and persist
+  const cubotics = Number(finalScore) / CUBOTICS_PER_SCORE;
+  const updatedAccount = { ...account, cubotics, neonShards: Number(account.neonShards || 0) };
   localStorage.setItem(accountStorageKey, JSON.stringify(updatedAccount));
 
   try {
     const response = await fetch(`${apiBase}/api/update-score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: account.username, score: finalScore }),
+      body: JSON.stringify({ username: account.username, cubotics, neonShards: updatedAccount.neonShards }),
     });
 
     const result = await response.json().catch(() => null);
-    if (result?.success && typeof result.score === 'number') {
-      updatedAccount.score = result.score;
+    if (result?.success && typeof result.cubotics === 'number') {
+      updatedAccount.cubotics = result.cubotics;
+      if (typeof result.neonShards === 'number') updatedAccount.neonShards = result.neonShards;
       localStorage.setItem(accountStorageKey, JSON.stringify(updatedAccount));
     }
   } catch {
-    // Ignore persistence failures and keep the local score.
+    // Ignore persistence failures and keep the local cubotics.
   }
 }
 
@@ -272,6 +274,7 @@ const floor = new THREE.Mesh(
 floor.position.y = -0.5;
 floor.receiveShadow = true;
 scene.add(floor);
+const baseplateTop = floor.position.y + 0.5;
 
 const walls = [];
 const boundaryMaterial = new THREE.MeshStandardMaterial({
@@ -360,6 +363,9 @@ for (const pos of [{ x: 18, z: 10 }, { x: -9, z: 5 }, { x: 6, z: -14 }]) {
 let currentRound = 0;
 let enemiesRemaining = 0;
 let score = 0;
+let neonShards = 0;
+const savedAccount = getStoredAccount();
+neonShards = Number(savedAccount?.neonShards || 0);
 let waveActive = false;
 let waveDelayTimer = 0;
 let gameOver = false;
@@ -441,6 +447,12 @@ goldDisplay.className = 'hud-item';
 document.body.appendChild(goldDisplay);
 hudPanel.appendChild(goldDisplay);
 
+const shardDisplay = document.createElement('div');
+shardDisplay.id = 'shardDisplay';
+shardDisplay.className = 'hud-item';
+document.body.appendChild(shardDisplay);
+hudPanel.appendChild(shardDisplay);
+
 const shopPromptDisplay = document.createElement('div');
 shopPromptDisplay.id = 'shopPromptDisplay';
 shopPromptDisplay.style.position = 'absolute';
@@ -493,6 +505,7 @@ function updateGameUI() {
   enemiesDisplay.textContent = `Enemies: ${enemiesRemaining}`;
   scoreDisplay.textContent = `Cubotics: ${formatCubotics(score)}`;
   goldDisplay.textContent = `Gold: ${goldCount}`;
+  shardDisplay.textContent = `Neon Shards: ${neonShards}`;
   playerHealthDisplay.textContent = `HP: ${player.health}/${player.maxHealth}`;
   const healthPercent = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
   playerHealthDisplay.style.setProperty('--hp-percent', `${healthPercent}%`);
@@ -698,6 +711,8 @@ function startNextWave() {
 }
 
 const enemies = [];
+const pendingEnemies = [];
+let enemyUpdateInProgress = false;
 const fragments = [];
 const projectiles = [];
 const golds = [];
@@ -1196,7 +1211,11 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   scene.add(helper);
   group.userData.helper = helper;
 
-  enemies.push(group);
+  if (enemyUpdateInProgress) {
+    pendingEnemies.push(group);
+  } else {
+    enemies.push(group);
+  }
   return group;
 }
 
@@ -1262,7 +1281,7 @@ function summonNecromancerMinions(enemy) {
 }
 
 function updateNecromancer(enemy, delta) {
-  if (enemy.userData.variant !== 'necromancer') return;
+  if (enemy.userData.variant !== 'necromancer' || enemy.userData.dead) return;
 
   const staff = enemy.userData.staff;
   if (staff) {
@@ -1331,14 +1350,22 @@ function updateEnemyHealthBar(enemy) {
       enemy.position.y + 1.4 + (enemy.userData.baseScale || 1) * 0.1,
       enemy.position.z
     );
+    // Face the player directly while keeping the bar level.
+    enemy.userData.healthBarContainer.lookAt(
+      player.position.x,
+      enemy.userData.healthBarContainer.position.y,
+      player.position.z
+    );
   }
 }
 
 function damageEnemy(enemy, amount) {
+  if (!enemy?.userData || enemy.userData.dead) return false;
   enemy.userData.health -= amount;
   updateEnemyHealthBar(enemy);
 
   if (enemy.userData.health <= 0) {
+    enemy.userData.dead = true;
     createExplosion(enemy.position, enemy.userData.color);
     const dropCount = enemy.userData.baseScale > 1 ? 4 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 2);
     for (let i = 0; i < dropCount; i++) {
@@ -1350,8 +1377,16 @@ function damageEnemy(enemy, amount) {
     if (enemy.userData.helper) scene.remove(enemy.userData.helper);
     if (enemy.userData.healthBarContainer) scene.remove(enemy.userData.healthBarContainer);
     if (enemy.userData.ramMarker) scene.remove(enemy.userData.ramMarker);
+    if (enemy.userData.summonRing) {
+      scene.remove(enemy.userData.summonRing);
+      enemy.userData.summonRing = null;
+    }
     
     score += 100;
+    if (enemy.userData.variant === 'boss') {
+      neonShards += 5;
+      status.textContent = 'Boss defeated. +5 Neon Shards';
+    }
     enemiesRemaining--;
     if (enemiesRemaining <= 0) waveActive = false;
     updateGameUI();
@@ -1468,12 +1503,22 @@ const player = {
 };
 
 const perkModifiers = {
-  fortified: { maxHealthBoost: 20 },
-  swift: { speedBoost: 1 },
-  impact: { damageBoost: 10 },
-  aegis: { maxHealthBoost: 35 },
-  storm: { speedBoost: 2, jumpBoost: 2 },
-  overdrive: { damageBoost: 18 },
+  fortified: { maxHealthBoost: 18 },
+  swift: { speedBoost: 1.1 },
+  impact: { damageBoost: 8 },
+  aegis: { maxHealthBoost: 28 },
+  storm: { speedBoost: 1.8, jumpBoost: 1.8 },
+  overdrive: { damageBoost: 12 },
+  guardian: { maxHealthBoost: 22 },
+  phantom: { speedBoost: 1.5, jumpBoost: 1.1 },
+  voltage: { damageBoost: 10 },
+  starlit: { maxHealthBoost: 12, speedBoost: 0.8, damageBoost: 6 },
+  berserker: { damageBoost: 16 },
+  sentinel: { maxHealthBoost: 26 },
+  vanguard: { maxHealthBoost: 30 },
+  cascade: { speedBoost: 1.9, jumpBoost: 1.3 },
+  nova: { damageBoost: 14 },
+  eclipse: { maxHealthBoost: 24 },
 };
 
 function getPurchasedPerks() {
@@ -1488,6 +1533,7 @@ function getPurchasedPerks() {
 function applySelectedPerk() {
   const purchased = new Set(getPurchasedPerks());
   const perkId = localStorage.getItem('cube_assault_perk');
+  const previousHealthRatio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
 
   if (!perkId || !purchased.has(perkId)) {
     localStorage.removeItem('cube_assault_perk');
@@ -1495,7 +1541,7 @@ function applySelectedPerk() {
     player.speed = 8;
     player.attackDamage = 34;
     player.jumpSpeed = 8;
-    player.health = player.maxHealth;
+    player.health = Math.min(player.maxHealth, player.maxHealth * previousHealthRatio);
     return;
   }
 
@@ -1504,7 +1550,7 @@ function applySelectedPerk() {
   player.speed = 8 + (mod.speedBoost || 0);
   player.attackDamage = 34 + (mod.damageBoost || 0);
   player.jumpSpeed = 8 + (mod.jumpBoost || 0);
-  player.health = player.maxHealth;
+  player.health = Math.min(player.maxHealth, player.maxHealth * previousHealthRatio);
 }
 
 camera.position.copy(player.position);
@@ -1568,7 +1614,7 @@ function updateStatus() {
 }
 
 function checkEnemyCollision(enemy) {
-  enemy.position.y = 1.3;
+  keepEnemyOnBaseplate(enemy);
   enemy.updateMatrixWorld(true);
   const enemyBox = new THREE.Box3().setFromObject(enemy).expandByScalar(0.08);
 
@@ -1590,6 +1636,18 @@ function checkEnemyCollision(enemy) {
   }
 
   return false;
+}
+
+function keepEnemyOnBaseplate(enemy) {
+  if (!enemy) return;
+
+  enemy.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(enemy);
+  if (Number.isFinite(bounds.min.y)) {
+    // Move the complete hit box onto the baseplate, including scaled bosses.
+    enemy.position.y += baseplateTop - bounds.min.y;
+    enemy.updateMatrixWorld(true);
+  }
 }
 
 function collide(position) {
@@ -1721,7 +1779,9 @@ function animate() {
   // Enemy AI: Move towards player
   player.damageCooldown = Math.max(0, player.damageCooldown - delta);
   const enemiesToKeep = [];
+  enemyUpdateInProgress = true;
   enemies.forEach((enemy, i) => {
+    if (enemy.userData.dead) return;
     // Handle visual flash effect when recently hit by a reflected projectile
     if (enemy.userData.flashTimer && enemy.userData.flashTimer > 0) {
       enemy.userData.flashTimer -= delta;
@@ -1747,7 +1807,6 @@ function animate() {
     if (handleHeavyRamAttack(enemy, delta, Math.max(0.0001, enemy.userData.baseScale || 1))) {
       if (enemy.userData.helper) enemy.userData.helper.update();
       if (enemy.userData.healthBarContainer) {
-        enemy.userData.healthBarContainer.quaternion.copy(camera.quaternion);
         updateEnemyHealthBar(enemy);
       }
       enemiesToKeep.push(enemy);
@@ -1758,6 +1817,7 @@ function animate() {
     const baseScale = enemy.userData.baseScale || 1;
     const currentScale = Math.max(ENEMY_MIN_SCALE_FACTOR * baseScale, baseScale * (0.5 + healthRatio * 0.5)); // Don't let them get TOO small
     enemy.scale.set(currentScale, currentScale, currentScale);
+    keepEnemyOnBaseplate(enemy);
     updateEnemyHealthBar(enemy);
 
     const speed = enemy.userData.speed;
@@ -1878,15 +1938,15 @@ function animate() {
 
     // Billboard the health bar (make it face the camera) and keep it anchored to the enemy
     if (enemy.userData.healthBarContainer) {
-      enemy.userData.healthBarContainer.quaternion.copy(camera.quaternion);
       updateEnemyHealthBar(enemy);
     }
 
     // If not defeated by wall damage, keep the enemy
-    if (!defeatedByWall) {
+    if (!defeatedByWall && !enemy.userData.dead) {
       enemiesToKeep.push(enemy);
     }
   });
+  enemyUpdateInProgress = false;
 
   // Update projectiles
   for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -1953,7 +2013,8 @@ function animate() {
   }
   // Update the main enemies array with only the living enemies
   enemies.length = 0;
-  enemies.push(...enemiesToKeep);
+  enemies.push(...enemiesToKeep.filter((enemy) => !enemy.userData.dead));
+  enemies.push(...pendingEnemies.splice(0).filter((enemy) => !enemy.userData.dead));
 
   // Update gold pickups
   for (let i = golds.length - 1; i >= 0; i--) {
@@ -2220,6 +2281,7 @@ document.addEventListener('pointerlockchange', () => {
   updateStatus();
 });
 
+applySelectedPerk();
 showStartOverlay();
 updateGameUI(); // Initial UI update
 updateStatus(); // Initial status update

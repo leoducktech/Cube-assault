@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "wrangler dev --local --port 8787"
+    "dev": "wrangler dev --local --port 8787",
+    "test:headless": "node test/headless-repro.js"
   },
   "repository": {
     "type": "git",
@@ -13,7 +14,8 @@
   },
   "devDependencies": {
     "wrangler":"^4.25.0",
-    "concurrently":"^9.2.1"
+    "concurrently":"^9.2.1",
+    "playwright": "^1.40.0"
   },
   "keywords": [],
   "author": "",

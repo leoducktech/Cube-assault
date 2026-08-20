@@ -344,6 +344,26 @@ c<!DOCTYPE html>
       border-color: rgba(74, 222, 128, 0.42);
       color: #dcfce7;
     }
+    .perk-status {
+      display: inline-block;
+      margin-left: 10px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .perk-status.owned {
+      background: rgba(99,102,241,0.08);
+      color: #c7d2fe;
+      border: 1px solid rgba(99,102,241,0.18);
+    }
+    .perk-status.equipped {
+      background: rgba(34,197,94,0.08);
+      color: #bbf7d0;
+      border: 1px solid rgba(34,197,94,0.18);
+    }
     .leaderboard-panel {
       width: min(1100px, 100%);
       margin: 0 auto 36px;
@@ -352,6 +372,31 @@ c<!DOCTYPE html>
     .leaderboard-header {
       margin-bottom: 16px;
       padding: 0 6px;
+    }
+    .leaderboard-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 6px 16px;
+    }
+    .leaderboard-tab {
+      border: 1px solid rgba(125, 211, 252, 0.2);
+      border-radius: 10px;
+      padding: 9px 12px;
+      background: rgba(15, 23, 42, 0.7);
+      color: #bae6fd;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .leaderboard-tab:hover,
+    .leaderboard-tab.active {
+      border-color: rgba(103, 232, 249, 0.65);
+      background: rgba(8, 145, 178, 0.22);
+      color: #ecfeff;
     }
     .leaderboard-status {
       color: #dbeafe;
@@ -525,6 +570,11 @@ c<!DOCTYPE html>
             <small style="display:block;margin-top:8px;color:#93c5fd;letter-spacing:0.08em;text-transform:uppercase;">1 Cubotics = 100 Score</small>
           </div>
           <div class="stat-box">
+            <span class="label">Neon Shards</span>
+            <strong id="account-shards">0</strong>
+            <small style="display:block;margin-top:8px;color:#67e8f9;letter-spacing:0.08em;text-transform:uppercase;">Earned from boss defeats</small>
+          </div>
+          <div class="stat-box">
             <span class="label">Status</span>
             <strong id="account-status">Offline</strong>
           </div>
@@ -561,6 +611,11 @@ c<!DOCTYPE html>
         <span class="live-badge">Live board</span>
       </div>
 
+      <div class="leaderboard-tabs" role="tablist" aria-label="Leaderboard types">
+        <button class="leaderboard-tab active" type="button" data-category="all-time" role="tab" aria-selected="true">All-Time</button>
+        <button class="leaderboard-tab" type="button" data-category="elite" role="tab" aria-selected="false">Elite Division</button>
+        <button class="leaderboard-tab" type="button" data-category="rising" role="tab" aria-selected="false">Rising Operators</button>
+      </div>
       <div id="leaderboard-status" class="leaderboard-status">Loading leaderboard...</div>
       <div id="leaderboard-list" class="leaderboard-list"></div>
     </div>
@@ -581,29 +636,65 @@ c<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Confirmation modal -->
+  <div id="confirm-modal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;z-index:50;">
+    <div id="confirm-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);"></div>
+    <div style="position:relative;background:linear-gradient(180deg,#071029,#0b1224);padding:20px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);width:min(520px,92%);box-shadow:0 18px 40px rgba(2,6,23,0.75);transform:translateY(-4px);">
+      <h3 id="confirm-title" style="margin:0 0 8px;color:#e6f6ff;">Confirm purchase</h3>
+      <p id="confirm-body" style="margin:0 0 16px;color:#cfe8ff;">Are you sure?</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+        <button id="confirm-cancel" class="perk-select" style="background:transparent;border:1px solid rgba(255,255,255,0.06);">Cancel</button>
+        <button id="confirm-ok" class="perk-select" style="background:linear-gradient(90deg,#67e8f9,#a78bfa);color:#020617;">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container" style="position:fixed;right:20px;top:20px;display:flex;flex-direction:column;gap:8px;z-index:60"></div>
+
   <script>
     const storageKey = 'cube_assault_account';
     const accountTitle = document.getElementById('account-title');
     const accountUsername = document.getElementById('account-username');
     const accountEmail = document.getElementById('account-email');
     const accountScore = document.getElementById('account-score');
+    const accountShards = document.getElementById('account-shards');
     const accountStatus = document.getElementById('account-status');
     const accountMessage = document.getElementById('account-message');
     const leaderboardStatus = document.getElementById('leaderboard-status');
     const leaderboardList = document.getElementById('leaderboard-list');
+    const leaderboardTabs = document.querySelectorAll('.leaderboard-tab');
     const perkItemsEl = document.getElementById('perk-items');
     const logoutBtn = document.getElementById('logout-btn');
     const loginLink = document.getElementById('login-link');
     const purchasedPerksKey = 'cube_assault_purchased_perks';
 
     const perkItems = [
-      { id: 'fortified', name: 'Fortified Frame', tag: 'Survival', description: 'Boosts max health and keeps you standing longer in a difficult run.' },
-      { id: 'swift', name: 'Swift Step', tag: 'Mobility', description: 'Improves movement speed for safer repositioning and faster escapes.' },
-      { id: 'impact', name: 'Impact Rounds', tag: 'Offense', description: 'Raises damage output so heavy targets fall faster.' },
-      { id: 'aegis', name: 'Aegis Guard', tag: 'Defense', description: 'Adds extra armor to improve survivability against incoming damage.' },
-      { id: 'storm', name: 'Storm Sprint', tag: 'Mobility', description: 'Increases your movement and jump speed for aggressive positioning.' },
-      { id: 'overdrive', name: 'Overdrive Core', tag: 'Offense', description: 'Cranks up attack power so every hit lands harder and faster.' }
+      { id: 'fortified', name: 'Fortified Frame', tag: 'Survival', cost: 18, description: 'Boosts max health and keeps you standing longer in a difficult run.', cuboticsBonus: 500, cuboticsMultiplier: 1.05 },
+      { id: 'swift', name: 'Swift Step', tag: 'Mobility', cost: 16, description: 'Improves movement speed for safer repositioning and faster escapes.' },
+      { id: 'impact', name: 'Impact Rounds', tag: 'Offense', cost: 22, description: 'Raises damage output so heavy targets fall faster.' },
+      { id: 'aegis', name: 'Aegis Guard', tag: 'Defense', cost: 24, description: 'Adds extra armor to improve survivability against incoming damage.' },
+      { id: 'storm', name: 'Storm Sprint', tag: 'Mobility', cost: 30, description: 'Increases your movement and jump speed for aggressive positioning.' },
+      { id: 'overdrive', name: 'Overdrive Core', tag: 'Offense', cost: 34, description: 'Cranks up attack power so every hit lands harder and faster.' },
+      { id: 'guardian', name: 'Guardian Pulse', tag: 'Defense', cost: 26, description: 'Improves your resistance to incoming pressure during survival-heavy waves.' },
+      { id: 'phantom', name: 'Phantom Drift', tag: 'Mobility', cost: 28, description: 'Lets you move with more agility and reposition faster under fire.' },
+      { id: 'voltage', name: 'Voltage Edge', tag: 'Offense', cost: 32, description: 'Sharpens your melee strikes and increases attack effectiveness.' },
+      { id: 'starlit', name: 'Starlit Core', tag: 'Utility', cost: 36, description: 'Balances armor, damage, and movement for a more versatile build.' },
+      { id: 'berserker', name: 'Berserker Rites', tag: 'Offense', cost: 40, description: 'Pushes your attack damage higher for relentless aggression.' },
+      { id: 'sentinel', name: 'Sentinel Shell', tag: 'Defense', cost: 38, description: 'Adds durable protection that helps in longer survival runs.' },
+      { id: 'vanguard', name: 'Vanguard Pulse', tag: 'Defense', cost: 42, description: 'Adds heavier protection and steadier survivability for long pushes.' },
+      { id: 'cascade', name: 'Cascade Step', tag: 'Mobility', cost: 44, description: 'Improves movement fluidity for better dodges and faster repositioning.' },
+      { id: 'nova', name: 'Nova Striker', tag: 'Offense', cost: 46, description: 'Boosts your attack output for strong burst pressure against elite enemies.' },
+      { id: 'eclipse', name: 'Eclipse Guard', tag: 'Defense', cost: 48, description: 'Grants solid protective scaling for tougher incoming danger.' }
     ];
+
+    function getStoredAccount() {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey) || 'null');
+      } catch (error) {
+        return null;
+      }
+    }
 
     function getPurchasedPerks() {
       try {
@@ -614,9 +705,40 @@ c<!DOCTYPE html>
       }
     }
 
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function syncAccountCuboticsToServer(cuboticsValue) {
+      const account = getStoredAccount();
+      if (!account?.username) return;
+
+      try {
+        const response = await fetch(`${apiBase}/api/update-score`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: account.username, cubotics: Number(cuboticsValue || 0) })
+        });
+        const result = await response.json().catch(() => null);
+        if (result?.success && typeof result.cubotics === 'number') {
+          account.cubotics = result.cubotics;
+          localStorage.setItem(storageKey, JSON.stringify(account));
+        }
+      } catch (error) {
+        // Ignore sync errors, keep the local cubotics.
+      }
+    }
+
     function renderPerks() {
       const purchased = new Set(getPurchasedPerks());
       const saved = localStorage.getItem('cube_assault_perk');
+      const account = getStoredAccount();
+      const balance = Number(account?.cubotics ?? (Number(account?.score || 0) / 100));
       const selected = purchased.has(saved) ? saved : null;
 
       if (!selected && saved) {
@@ -630,32 +752,97 @@ c<!DOCTYPE html>
         card.className = 'perk-item';
         const isPurchased = purchased.has(item.id);
         const isSelected = selected === item.id;
+        const costInCubotics = item.cost;
+        const canAfford = balance >= costInCubotics;
+
+        // build tooltip with description, cost and any bonuses
+        let tooltip = `${item.description} Cost: ${item.cost} Cubotics.`;
+        if (typeof item.cuboticsBonus === 'number') tooltip += ` Immediate bonus: ${item.cuboticsBonus} score.`;
+        if (typeof item.cuboticsMultiplier === 'number') tooltip += ` Multiplier: ${item.cuboticsMultiplier}.`;
+        const esc = escapeHtml(tooltip);
+        const badgeHtml = isSelected
+          ? `<span class="perk-status equipped" title="${esc}">★ Equipped</span>`
+          : (isPurchased ? `<span class="perk-status owned" title="${esc}">✓ Owned</span>` : '');
 
         card.innerHTML = `
-          <h4>${item.name}</h4>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <h4 style="margin:0">${item.name}</h4>
+            ${badgeHtml}
+          </div>
           <p>${item.description}</p>
           <div class="perk-meta">
             <span class="perk-badge">${item.tag}</span>
-            <button class="perk-select ${isSelected ? 'selected' : ''}">
-              ${isPurchased ? (isSelected ? 'Equipped' : 'Equip') : 'Purchase'}
-            </button>
+            <span class="perk-cost">${item.cost} C</span>
           </div>
+          <button class="perk-select ${isSelected ? 'selected' : ''}" ${(!isPurchased && !canAfford) ? 'disabled' : ''}>
+            ${isPurchased ? (isSelected ? 'Equipped' : 'Equip') : `Purchase ${item.cost} C`} 
+          </button>
         `;
 
-        card.querySelector('.perk-select').addEventListener('click', () => {
+        const btn = card.querySelector('.perk-select');
+        btn.addEventListener('click', () => {
+          const acct = getStoredAccount();
           if (!isPurchased) {
-            const nextPurchased = [...purchased];
-            if (!nextPurchased.includes(item.id)) {
-              nextPurchased.push(item.id);
-              localStorage.setItem(purchasedPerksKey, JSON.stringify(nextPurchased));
+            if (!acct) {
+              accountMessage.textContent = 'Log in to buy perks with Cubotics.';
+              return;
             }
-            localStorage.setItem('cube_assault_perk', item.id);
-            renderPerks();
+
+              if (balance < costInCubotics) {
+                accountMessage.textContent = `You need ${item.cost} Cubotics to unlock ${item.name}.`;
+                return;
+              }
+
+            // show confirmation modal
+            showConfirm(`Purchase ${item.name}?`, `This will cost ${item.cost} Cubotics. Proceed?`, async (ok) => {
+              if (!ok) return;
+
+              // mark purchased
+              const nextPurchased = [...purchased];
+              if (!nextPurchased.includes(item.id)) {
+                nextPurchased.push(item.id);
+                localStorage.setItem(purchasedPerksKey, JSON.stringify(nextPurchased));
+              }
+
+              // charge cost from cubotics
+              const nextCub = Number(acct.cubotics ?? (Number(acct.score || 0) / 100)) - costInCubotics;
+              acct.cubotics = Math.max(0, nextCub);
+
+              // apply immediate bonus (legacy bonus values are in raw score, convert to cubotics)
+              if (typeof item.cuboticsBonus === 'number' && item.cuboticsBonus > 0) {
+                acct.cubotics = Number(acct.cubotics || 0) + Number(item.cuboticsBonus) / 100;
+                accountMessage.textContent = `Purchased ${item.name}: immediate bonus applied.`;
+              }
+
+              // save and equip by default after purchase
+              acct.activePerk = item.id;
+              if (typeof item.cuboticsMultiplier === 'number') {
+                acct.perkMultiplier = item.cuboticsMultiplier;
+              }
+
+              localStorage.setItem(storageKey, JSON.stringify(acct));
+              syncAccountCuboticsToServer(acct.cubotics);
+              loadAccount();
+              renderPerks();
+              showToast(`${item.name} purchased`);
+            });
             return;
+          }
+
+          // already purchased -> equip
+          const acct2 = acct || getStoredAccount();
+          if (acct2) {
+            acct2.activePerk = item.id;
+            if (typeof item.cuboticsMultiplier === 'number') {
+              acct2.perkMultiplier = item.cuboticsMultiplier;
+            }
+            localStorage.setItem(storageKey, JSON.stringify(acct2));
+            accountMessage.textContent = `${item.name} equipped.`;
           }
 
           localStorage.setItem('cube_assault_perk', item.id);
           renderPerks();
+          showToast(`${item.name} equipped`);
         });
 
         perkItemsEl.appendChild(card);
@@ -669,6 +856,7 @@ c<!DOCTYPE html>
         accountUsername.textContent = 'Please sign in';
         accountEmail.textContent = '-';
         accountScore.textContent = '0';
+        accountShards.textContent = '0';
         accountStatus.textContent = 'Offline';
         accountMessage.textContent = 'Create an account or log in to sync your profile and Cubotics balance.';
         if (loginLink) loginLink.textContent = 'LOG IN';
@@ -677,13 +865,26 @@ c<!DOCTYPE html>
 
       try {
         const account = JSON.parse(raw);
+        // Ensure active perk is actually owned; clear if not
+        try {
+          const owned = getPurchasedPerks();
+          if (account.activePerk && !owned.includes(account.activePerk)) {
+            delete account.activePerk;
+            delete account.perkMultiplier;
+            localStorage.removeItem('cube_assault_perk');
+            localStorage.setItem(storageKey, JSON.stringify(account));
+          }
+        } catch (e) {
+          // ignore ownership validation errors
+        }
         accountTitle.textContent = `${account.username || 'Operator'}'s profile`;
         accountUsername.textContent = account.username || 'Unknown';
         accountEmail.textContent = account.email || 'No email registered';
-        const cuboticsValue = Number(account.score || 0) / 100;
+        const cuboticsValue = Number(account.cubotics ?? (Number(account.score || 0) / 100));
         accountScore.textContent = Number.isInteger(cuboticsValue) ? cuboticsValue.toString() : cuboticsValue.toFixed(1);
+        accountShards.textContent = String(Number(account.neonShards || 0));
         accountStatus.textContent = 'Online';
-        accountMessage.textContent = 'Welcome back, operator. Your Cubotics are synced and ready.';
+        accountMessage.textContent = 'Welcome back, operator. Your Cubotics are synced and ready.' + (account.activePerk ? ` Equipped: ${account.activePerk.replace(/[-_]/g,' ')}.` : '');
         if (loginLink) loginLink.textContent = 'VIEW ACCOUNT';
         return account;
       } catch (error) {
@@ -702,9 +903,10 @@ c<!DOCTYPE html>
       return '';
     })();
 
-    async function loadLeaderboard() {
+    async function loadLeaderboard(category = 'all-time') {
       try {
-        const response = await fetch(`${apiBase}/api/leaderboard`);
+        leaderboardStatus.textContent = 'Loading leaderboard...';
+        const response = await fetch(`${apiBase}/api/leaderboard?category=${encodeURIComponent(category)}`);
         const result = await response.json();
 
         if (!response.ok || !Array.isArray(result.entries)) {
@@ -714,18 +916,26 @@ c<!DOCTYPE html>
 
         leaderboardList.innerHTML = '';
         if (!result.entries.length) {
-          leaderboardStatus.textContent = 'No Cubotics recorded yet — be the first to climb the chart.';
+          leaderboardStatus.textContent = category === 'elite'
+            ? 'No elite operators have reached 100 Cubotics yet.'
+            : category === 'rising'
+              ? 'No rising operators recorded yet.'
+              : 'No Cubotics recorded yet — be the first to climb the chart.';
           return;
         }
 
-        leaderboardStatus.textContent = 'Top operators by Cubotics';
+        leaderboardStatus.textContent = category === 'elite'
+          ? 'Elite operators with 100+ Cubotics'
+          : category === 'rising'
+            ? 'Operators building their first 100 Cubotics'
+            : 'Top operators by Cubotics';
         result.entries.forEach((entry, index) => {
           const row = document.createElement('div');
           row.className = 'leaderboard-row';
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '◆';
           const label = index === 0 ? 'Commander' : index === 1 ? 'Specialist' : index === 2 ? 'Rogue' : 'Operative';
 
-          const cuboticsDisplay = Number(entry.score || 0) / 100;
+          const cuboticsDisplay = Number(entry.cubotics || 0);
           row.innerHTML = `
             <div class="leaderboard-player">
               <span class="medal">${medal}</span>
@@ -742,6 +952,17 @@ c<!DOCTYPE html>
         leaderboardStatus.textContent = 'Leaderboard unavailable right now.';
       }
     }
+
+    leaderboardTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        leaderboardTabs.forEach((item) => {
+          const isActive = item === tab;
+          item.classList.toggle('active', isActive);
+          item.setAttribute('aria-selected', String(isActive));
+        });
+        loadLeaderboard(tab.dataset.category);
+      });
+    });
 
     logoutBtn.addEventListener('click', () => {
       localStorage.removeItem(storageKey);
@@ -767,6 +988,48 @@ c<!DOCTYPE html>
     renderPerks();
     loadAccount();
     loadLeaderboard();
+
+    // Modal and toast helpers
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmTitle = document.getElementById('confirm-title');
+    const confirmBody = document.getElementById('confirm-body');
+    const confirmOk = document.getElementById('confirm-ok');
+    const confirmCancel = document.getElementById('confirm-cancel');
+
+    function showConfirm(title, body, cb) {
+      confirmTitle.textContent = title;
+      confirmBody.textContent = body;
+      confirmModal.style.display = 'flex';
+      function cleanup() {
+        confirmOk.removeEventListener('click', onOk);
+        confirmCancel.removeEventListener('click', onCancel);
+        confirmModal.style.display = 'none';
+      }
+      function onOk() { cleanup(); cb(true); }
+      function onCancel() { cleanup(); cb(false); }
+      confirmOk.addEventListener('click', onOk);
+      confirmCancel.addEventListener('click', onCancel);
+    }
+
+    const toastContainer = document.getElementById('toast-container');
+    function showToast(text, timeout = 3000) {
+      const t = document.createElement('div');
+      t.style.background = 'linear-gradient(90deg, rgba(11,18,36,0.95), rgba(7,16,33,0.95))';
+      t.style.color = '#dff7ff';
+      t.style.padding = '12px 16px';
+      t.style.borderRadius = '12px';
+      t.style.border = '1px solid rgba(255,255,255,0.06)';
+      t.style.boxShadow = '0 10px 30px rgba(2,6,23,0.7)';
+      t.style.backdropFilter = 'saturate(120%) blur(4px)';
+      t.style.maxWidth = '320px';
+      t.style.opacity = '1';
+      t.style.transition = 'transform 240ms ease, opacity 240ms ease';
+      t.style.transform = 'translateY(-6px)';
+      t.textContent = text;
+      toastContainer.appendChild(t);
+      // animate out then remove
+      setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(-18px)'; setTimeout(() => t.remove(), 360); }, timeout);
+    }
   </script>
 </body>
 </html>

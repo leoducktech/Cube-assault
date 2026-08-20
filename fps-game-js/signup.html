@@ -198,6 +198,8 @@
                       localStorage.setItem('cube_assault_account', JSON.stringify({
                         username: payload.username,
                         email: payload.email,
+                        cubotics: 0,
+                        neonShards: 0,
                       }));
                       signupMessage.textContent = 'Account created locally. Redirecting...';
                       signupMessage.className = 'mt-4 text-sm font-semibold text-emerald-300';
@@ -216,6 +218,8 @@
                 localStorage.setItem('cube_assault_account', JSON.stringify({
                   username: payload.username,
                   email: payload.email,
+                  cubotics: 0,
+                  neonShards: 0,
                 }));
                 setTimeout(() => window.location.href = 'account.html', 1000);
                 return;
@@ -239,6 +243,8 @@
                 localStorage.setItem('cube_assault_account', JSON.stringify({
                   username: payload.username,
                   email: payload.email,
+                  cubotics: 0,
+                  neonShards: 0,
                 }));
 
                 signupMessage.textContent = 'Account created locally. Redirecting...';

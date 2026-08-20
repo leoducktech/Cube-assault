@@ -5,6 +5,32 @@ export async function onRequestOptions(context) {
   });
 }
 
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const { pathname, searchParams } = new URL(request.url);
+
+  if (pathname !== '/api/leaderboard') {
+    return jsonResponse({ success: false, error: 'Not found.' }, 404);
+  }
+
+  await ensureUserTable(env);
+  const category = String(searchParams.get('category') || 'all-time');
+  const filters = {
+    'all-time': '1 = 1',
+    elite: 'COALESCE(Cubotics, 0) >= 100',
+    rising: 'COALESCE(Cubotics, 0) < 100',
+  };
+  const filter = filters[category] || filters['all-time'];
+  const entries = await env.DB.prepare(
+    `SELECT username, Cubotics FROM users WHERE ${filter} ORDER BY Cubotics DESC LIMIT 10`
+  ).all();
+
+  return jsonResponse({ success: true, category, entries: (entries.results || []).map((entry) => ({
+    username: entry.username,
+    cubotics: Number(entry.Cubotics || 0),
+  })) }, 200);
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { pathname } = new URL(request.url);
@@ -25,7 +51,7 @@ export async function onRequestPost(context) {
     await ensureUserTable(env);
 
     const account = await env.DB.prepare(
-      'SELECT username, email, password, score FROM users WHERE username = ? LIMIT 1'
+      'SELECT username, email, password, Cubotics, NeonShards FROM users WHERE username = ? LIMIT 1'
     )
       .bind(username)
       .first();
@@ -39,12 +65,15 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: 'Incorrect password.' }, 401);
     }
 
-    return jsonResponse({ success: true, email: account.email, score: Number(account.score || 0) }, 200);
+    return jsonResponse({ success: true, email: account.email, cubotics: Number(account.Cubotics || 0), neonShards: Number(account.NeonShards || 0) }, 200);
   }
 
   if (pathname === '/api/update-score') {
     const username = String(body.username || '').trim();
     const score = Number(body.score || 0);
+    // accept either raw score or cubotics in request; convert score->cubotics if needed
+    const cubotics = typeof body.cubotics === 'number' ? Number(body.cubotics) : (Number(score) / 100);
+    const neonShards = Number(body.neonShards || 0);
 
     if (!username) {
       return jsonResponse({ success: false, error: 'Username is required.' }, 400);
@@ -52,24 +81,34 @@ export async function onRequestPost(context) {
 
     await ensureUserTable(env);
     await env.DB.prepare(
-      'UPDATE users SET score = MAX(COALESCE(score, 0), ?) WHERE username = ?'
+      'UPDATE users SET Cubotics = MAX(COALESCE(Cubotics, 0), ?) WHERE username = ?'
     )
-      .bind(score, username)
+      .bind(cubotics, username)
+      .run();
+    await env.DB.prepare('UPDATE users SET NeonShards = MAX(COALESCE(NeonShards, 0), ?) WHERE username = ?')
+      .bind(neonShards, username)
       .run();
 
-    const updated = await env.DB.prepare('SELECT score FROM users WHERE username = ? LIMIT 1').bind(username).first();
-    return jsonResponse({ success: true, score: Number(updated?.score || 0) }, 200);
+    const updated = await env.DB.prepare('SELECT Cubotics, NeonShards FROM users WHERE username = ? LIMIT 1').bind(username).first();
+    return jsonResponse({ success: true, cubotics: Number(updated?.Cubotics || 0), neonShards: Number(updated?.NeonShards || 0) }, 200);
   }
 
   if (pathname === '/api/leaderboard') {
     await ensureUserTable(env);
+    const category = String(new URL(request.url).searchParams.get('category') || 'all-time');
+    const filters = {
+      'all-time': '1 = 1',
+      elite: 'COALESCE(Cubotics, 0) >= 100',
+      rising: 'COALESCE(Cubotics, 0) < 100',
+    };
+    const filter = filters[category] || filters['all-time'];
     const entries = await env.DB.prepare(
-      'SELECT username, score FROM users WHERE score IS NOT NULL ORDER BY score DESC LIMIT 10'
+      `SELECT username, Cubotics FROM users WHERE ${filter} ORDER BY Cubotics DESC LIMIT 10`
     ).all();
 
-    return jsonResponse({ success: true, entries: (entries.results || []).map((entry) => ({
+    return jsonResponse({ success: true, category, entries: (entries.results || []).map((entry) => ({
       username: entry.username,
-      score: Number(entry.score || 0),
+      cubotics: Number(entry.Cubotics || 0),
     })) }, 200);
   }
 
@@ -101,7 +140,7 @@ export async function onRequestPost(context) {
   const passwordHash = await hashPassword(password);
 
   await env.DB.prepare(
-    'INSERT INTO users (username, email, password, score) VALUES (?, ?, ?, 0)'
+    'INSERT INTO users (username, email, password, Cubotics, NeonShards) VALUES (?, ?, ?, 0, 0)'
   )
     .bind(username, email, passwordHash)
     .run();
@@ -117,7 +156,9 @@ async function ensureUserTable(env) {
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        score INTEGER DEFAULT 0
+        score INTEGER DEFAULT 0,
+        Cubotics INTEGER DEFAULT 0,
+        NeonShards INTEGER DEFAULT 0
       )
     `).run();
   } catch {
@@ -128,6 +169,25 @@ async function ensureUserTable(env) {
     await env.DB.prepare('ALTER TABLE users ADD COLUMN score INTEGER DEFAULT 0').run();
   } catch {
     // Ignore if the column already exists.
+  }
+
+  try {
+    await env.DB.prepare('ALTER TABLE users ADD COLUMN Cubotics INTEGER DEFAULT 0').run();
+  } catch {
+    // Ignore if the column already exists.
+  }
+
+  try {
+    await env.DB.prepare('ALTER TABLE users ADD COLUMN NeonShards INTEGER DEFAULT 0').run();
+  } catch {
+    // Ignore if the column already exists.
+  }
+
+  // Migrate existing score values (raw score) into Cubotics = score/100 where applicable
+  try {
+    await env.DB.prepare('UPDATE users SET Cubotics = CAST((COALESCE(score,0)/100.0) AS INTEGER) WHERE (Cubotics IS NULL OR Cubotics = 0) AND (score IS NOT NULL)').run();
+  } catch {
+    // ignore migration issues
   }
 }
 
@@ -157,7 +217,7 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   };
 }
 
