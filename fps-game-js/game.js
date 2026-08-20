@@ -918,15 +918,15 @@ function getEnemyVariantConfig(type, color, emissiveColor) {
       };
     case 'boss':
       return {
-        bodyGeometry: new THREE.BoxGeometry(1, 1, 1),
+        bodyGeometry: new THREE.BoxGeometry(1.7, 0.8, 2.2),
         bodyColor: color,
         bodyEmissive: emissiveColor,
         bodyEmissiveIntensity: 0.75,
-        armGeometry: new THREE.BoxGeometry(0.25, 0.7, 0.25),
+        armGeometry: new THREE.BoxGeometry(0.32, 0.55, 0.5),
         armColor: color,
         armEmissive: emissiveColor,
         armEmissiveIntensity: 0.55,
-        legGeometry: new THREE.BoxGeometry(0.3, 0.8, 0.3),
+        legGeometry: new THREE.BoxGeometry(0.38, 0.45, 0.8),
         legColor: 0x333333,
         eyeColor: 0x000000,
         scaleMultiplier: 1,
@@ -1126,6 +1126,30 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   rightLeg.castShadow = true;
   group.add(rightLeg);
 
+  if (type === 'boss') {
+    leftArm.visible = false;
+    rightArm.visible = false;
+    leftLeg.visible = false;
+    rightLeg.visible = false;
+    const trackMat = new THREE.MeshStandardMaterial({ color: 0x202938, roughness: 0.85, metalness: 0.7 });
+    for (const x of [-0.95, 0.95]) {
+      const track = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 1.75), trackMat);
+      track.position.set(x, -0.42, 0);
+      track.castShadow = true;
+      track.receiveShadow = true;
+      group.add(track);
+    }
+
+    const turret = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.72, 0.82, 0.38, 8),
+      new THREE.MeshStandardMaterial({ color: 0x38465c, emissive: 0x101c35, emissiveIntensity: 0.6, metalness: 0.75, roughness: 0.5 })
+    );
+    turret.rotation.x = Math.PI / 2;
+    turret.position.set(0, 0.48, 0);
+    turret.castShadow = true;
+    group.add(turret);
+  }
+
   if (type === 'necromancer') {
     const staffGroup = new THREE.Group();
     const staffMat = new THREE.MeshStandardMaterial({ color: 0x8b7ad9, emissive: 0x371a65, emissiveIntensity: 0.5 });
@@ -1157,9 +1181,19 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
   rightEye.position.set(type === 'light' ? 0.18 : type === 'necromancer' ? 0.2 : 0.25, 0.2, 0.51);
   group.add(rightEye);
-  const mouthGeo = new THREE.BoxGeometry(type === 'light' ? 0.34 : type === 'necromancer' ? 0.42 : 0.5, 0.1, 0.1);
-  const mouth = new THREE.Mesh(mouthGeo, eyeMat);
-  mouth.position.set(0, -0.25, 0.51);
+  const mouthGeo = type === 'boss'
+    ? new THREE.CylinderGeometry(0.2, 0.25, 0.8, 12)
+    : new THREE.BoxGeometry(type === 'light' ? 0.34 : type === 'necromancer' ? 0.42 : 0.5, 0.1, 0.1);
+  const mouth = new THREE.Mesh(mouthGeo, type === 'boss'
+    ? new THREE.MeshStandardMaterial({ color: 0x151b28, emissive: 0xff4d3d, emissiveIntensity: 1.2, metalness: 0.8, roughness: 0.35 })
+    : eyeMat);
+  if (type === 'boss') {
+    mouth.rotation.x = -Math.PI / 2;
+    mouth.position.set(0, 0.55, -1.35);
+    group.userData.nozzle = mouth;
+  } else {
+    mouth.position.set(0, -0.25, 0.51);
+  }
   group.add(mouth);
 
   // Health Bar
@@ -1199,6 +1233,9 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   group.userData.summonTimer = 0;
   group.userData.summonCooldown = 0;
   group.userData.projectileCooldown = 1.2;
+  group.userData.firePattern = 0;
+  group.userData.burstRemaining = 0;
+  group.userData.burstTimer = 0;
 
   createEnemyScars(group);
   updateEnemyScars(group);
@@ -1219,7 +1256,7 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   return group;
 }
 
-function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss') {
+function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss', directionOverride = null, options = {}) {
   if (variant === 'heavy') return;
   const baseSize = variant === 'heavy' ? 0.45 : 0.6;
   const size = baseSize * Math.max(0.8, sizeScale);
@@ -1229,7 +1266,9 @@ function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss') 
   projectile.position.copy(sourcePos);
   projectile.position.y += 1.2;
 
-  const dir = new THREE.Vector3().subVectors(player.position, projectile.position);
+  const dir = directionOverride
+    ? directionOverride.clone().normalize()
+    : new THREE.Vector3().subVectors(player.position, projectile.position).normalize();
   if (dir.lengthSq() < 0.0001) {
     dir.set(0, 0, -1);
   } else {
@@ -1239,13 +1278,96 @@ function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss') 
   projectile.userData.velocity = dir.clone().multiplyScalar(variant === 'heavy' ? 7.5 : 10 + 4 * Math.max(0.5, sizeScale));
   const spawnOffset = Math.max(0.4, size * 0.8) + 0.2;
   projectile.position.addScaledVector(dir, spawnOffset);
-  projectile.userData.life = variant === 'heavy' ? 1.2 : 5.0;
-  projectile.userData.damage = Math.ceil((variant === 'heavy' ? 8 : 12) * Math.max(1, sizeScale));
+  projectile.userData.life = variant === 'heavy' ? 1.2 : (options.life || 5.0);
+  projectile.userData.damage = options.damage || Math.ceil((variant === 'heavy' ? 8 : 12) * Math.max(1, sizeScale));
+  projectile.userData.explosionRadius = options.explosionRadius || 0;
   projectile.userData.reflected = false;
   projectile.userData.variant = variant;
 
   scene.add(projectile);
   projectiles.push(projectile);
+}
+
+function bossHasLineOfSight(enemy) {
+  const source = enemy.position.clone();
+  source.y += 0.7 * (enemy.userData.baseScale || 1);
+  const target = player.position.clone();
+  const direction = target.clone().sub(source);
+  const distance = direction.length();
+  if (distance <= 0.001) return true;
+
+  direction.normalize();
+  const raycaster = new THREE.Raycaster(source, direction, 0, distance);
+  const hits = raycaster.intersectObjects(walls, true);
+  return hits.length === 0;
+}
+
+function getBossNozzleMuzzle(enemy) {
+  enemy.updateMatrixWorld(true);
+  const muzzle = enemy.userData.nozzle
+    ? enemy.userData.nozzle.localToWorld(new THREE.Vector3(0, 0, -0.48))
+    : enemy.position.clone();
+  return muzzle;
+}
+
+function fireBossPattern(enemy) {
+  const muzzle = getBossNozzleMuzzle(enemy);
+  const toPlayer = player.position.clone().sub(muzzle).normalize();
+  const color = enemy.userData.color || 0xff5544;
+  const scale = enemy.userData.baseScale || 1;
+  const pattern = enemy.userData.firePattern % 3;
+  enemy.userData.firePattern += 1;
+
+  if (pattern === 0) {
+    // Rapid fire: a short five-round burst from the nozzle.
+    enemy.userData.burstRemaining = 5;
+    enemy.userData.burstTimer = 0;
+    return;
+  }
+
+  if (pattern === 1) {
+    // Explosion shot: one slow shell that detonates on impact.
+    spawnBossProjectile(muzzle, color, scale * 1.25, 'boss', toPlayer, {
+      damage: Math.ceil(20 * scale),
+      explosionRadius: 4.5,
+      life: 6,
+    });
+    return;
+  }
+
+  // 360-degree shot: a radial volley around the tank.
+  for (let i = 0; i < 16; i += 1) {
+    const angle = (i / 16) * Math.PI * 2;
+    spawnBossProjectile(
+      muzzle,
+      color,
+      scale * 0.8,
+      'boss',
+      new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)),
+      { damage: Math.ceil(9 * scale), life: 3.5 }
+    );
+  }
+}
+
+function fireBossRapidBurst(enemy) {
+  if (enemy.userData.burstRemaining <= 0) return;
+  const muzzle = getBossNozzleMuzzle(enemy);
+  const direction = player.position.clone().sub(muzzle).normalize();
+  spawnBossProjectile(muzzle, enemy.userData.color || 0xff5544, enemy.userData.baseScale || 1, 'boss', direction, {
+    damage: Math.ceil(10 * (enemy.userData.baseScale || 1)),
+    life: 4,
+  });
+  enemy.userData.burstRemaining -= 1;
+  enemy.userData.burstTimer = 0.16;
+}
+
+function detonateBossProjectile(projectile) {
+  const radius = projectile.userData.explosionRadius || 0;
+  const color = projectile.material?.color?.getHex?.() || 0xff5544;
+  createExplosion(projectile.position, color);
+  if (radius > 0 && projectile.position.distanceTo(player.position) <= radius + 1) {
+    damagePlayer(Math.ceil(28 * Math.max(1, radius / 4.5)));
+  }
 }
 
 function summonNecromancerMinions(enemy) {
@@ -1920,12 +2042,14 @@ function animate() {
     const isBoss = enemy.userData.variant === 'boss';
     if (isBoss) {
       enemy.userData.shootTimer = (enemy.userData.shootTimer || 0) - delta;
-      if (enemy.userData.shootTimer <= 0) {
-        const distanceToPlayer = enemy.position.distanceTo(player.position);
-        if (distanceToPlayer <= 24) {
-          spawnBossProjectile(enemy.position, enemy.userData.color, enemy.userData.baseScale || 1, 'boss');
-        }
-        enemy.userData.shootTimer = 1.5 + Math.random();
+      enemy.userData.burstTimer = Math.max(0, (enemy.userData.burstTimer || 0) - delta);
+      const distanceToPlayer = enemy.position.distanceTo(player.position);
+      const hasLineOfSight = distanceToPlayer <= 32 && bossHasLineOfSight(enemy);
+      if (hasLineOfSight && enemy.userData.burstRemaining > 0 && enemy.userData.burstTimer <= 0) {
+        fireBossRapidBurst(enemy);
+      } else if (hasLineOfSight && enemy.userData.burstRemaining <= 0 && enemy.userData.shootTimer <= 0) {
+        fireBossPattern(enemy);
+        enemy.userData.shootTimer = 4.5 + Math.random() * 1.5;
       }
     }
 
@@ -1956,7 +2080,7 @@ function animate() {
     
     // Collision check with player
     if (p.position.distanceTo(player.position) < 1.2) { // TODO: Add player damage logic here
-      // Here you could trigger player damage logic
+      if (p.userData.explosionRadius) detonateBossProjectile(p);
       scene.remove(p);
       projectiles.splice(i, 1);
       continue;
@@ -1968,7 +2092,7 @@ function animate() {
     for (const wall of walls) {
         const wallBox = new THREE.Box3().setFromObject(wall);
         if (projectileBox.intersectsBox(wallBox)) {
-            createExplosion(p.position, p.material.color.getHex()); // Use projectile's color for explosion
+          detonateBossProjectile(p);
             scene.remove(p);
             projectiles.splice(i, 1);
             hitWall = true;
@@ -2007,6 +2131,7 @@ function animate() {
     if (hitEnemy) continue;
 
     if (p.userData.life <= 0) {
+      if (p.userData.explosionRadius) detonateBossProjectile(p);
       scene.remove(p);
       projectiles.splice(i, 1);
     }
