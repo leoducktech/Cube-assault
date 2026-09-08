@@ -149,7 +149,7 @@ c<!DOCTYPE html>
     .dashboard-panel {
       width: min(1100px, 100%);
       display: grid;
-      grid-template-columns: 2.2fr 0.8fr;
+      grid-template-columns: 1fr;
       gap: 24px;
       margin: 0 auto 28px;
       align-items: stretch;
@@ -245,6 +245,38 @@ c<!DOCTYPE html>
       flex-direction: column;
       gap: 14px;
       justify-content: center;
+    }
+    .combat-stats-panel {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      width: 100%;
+      margin-top: 18px;
+    }
+    .combat-stats-panel h3 {
+      grid-column: 1 / -1;
+      color: #f3d6ff;
+      font-size: 1rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .combat-stat {
+      display: grid;
+      gap: 6px;
+      padding: 11px 12px;
+      border: 1px solid rgba(220, 130, 255, 0.22);
+      border-radius: 10px;
+      background: rgba(220, 130, 255, 0.08);
+      color: #eadcff;
+      font-family: 'Segoe UI Mono', Consolas, Monaco, monospace;
+      font-size: 0.82rem;
+    }
+    .combat-stat strong {
+      color: #ffffff;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 768px) {
+      .combat-stats-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .mini-btn {
       text-decoration: none;
@@ -363,6 +395,64 @@ c<!DOCTYPE html>
       background: rgba(34,197,94,0.08);
       color: #bbf7d0;
       border: 1px solid rgba(34,197,94,0.18);
+    }
+    .perk-wheel-panel {
+      width: min(1100px, 100%);
+      margin: 0 auto 36px;
+      padding: 22px 18px;
+      border: 1px solid rgba(244, 114, 182, 0.24);
+      border-radius: 20px;
+      background: rgba(18, 12, 35, 0.78);
+      box-shadow: 0 0 25px rgba(244, 114, 182, 0.08), inset 0 0 20px rgba(255,255,255,0.02);
+    }
+    .perk-wheel-content {
+      display: grid;
+      grid-template-columns: minmax(220px, 300px) 1fr;
+      gap: 28px;
+      align-items: center;
+    }
+    .perk-wheel-stage {
+      position: relative;
+      width: min(270px, 80vw);
+      aspect-ratio: 1;
+      margin: 0 auto;
+    }
+    .perk-wheel {
+      width: 100%;
+      height: 100%;
+      border: 8px solid rgba(244, 114, 182, 0.55);
+      border-radius: 50%;
+      background: conic-gradient(#67e8f9 0deg 45deg, #a78bfa 45deg 90deg, #f472b6 90deg 135deg, #facc15 135deg 180deg, #34d399 180deg 225deg, #fb7185 225deg 270deg, #60a5fa 270deg 315deg, #c084fc 315deg 360deg);
+      box-shadow: 0 0 28px rgba(244, 114, 182, 0.28), inset 0 0 22px rgba(3, 7, 18, 0.7);
+      transition: transform 3.2s cubic-bezier(0.12, 0.72, 0.16, 1);
+    }
+    .perk-wheel::after {
+      content: '';
+      position: absolute;
+      inset: 31%;
+      border-radius: 50%;
+      background: #0a1025;
+      border: 2px solid rgba(255,255,255,0.22);
+      box-shadow: 0 0 18px rgba(3, 7, 18, 0.7);
+    }
+    .perk-wheel-pointer {
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      z-index: 2;
+      width: 0;
+      height: 0;
+      transform: translateX(-50%);
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-top: 24px solid #f8fafc;
+      filter: drop-shadow(0 0 6px rgba(244,114,182,0.8));
+    }
+    .perk-wheel-copy h3 { color: #f9a8d4; margin-bottom: 10px; }
+    .perk-wheel-copy p { color: #d9c7f4; line-height: 1.6; margin-bottom: 16px; }
+    .perk-wheel-result { min-height: 28px; color: #fef3c7; font-weight: 700; margin-top: 12px; }
+    @media (max-width: 768px) {
+      .perk-wheel-content { grid-template-columns: 1fr; }
     }
     .leaderboard-panel {
       width: min(1100px, 100%);
@@ -541,7 +631,7 @@ c<!DOCTYPE html>
     <div class="action-buttons">
       <a href="index.html" class="btn btn-play">▶ PLAY NOW</a>
       <a href="login.html" class="btn btn-secondary" id="login-link">LOG IN</a>
-      <a href="signup.html" class="btn btn-secondary">SIGN UP</a>
+      <a href="signup.html" class="btn btn-secondary" id="signup-link">SIGN UP</a>
       <button id="logout-btn" class="btn btn-secondary" type="button">LOG OUT</button>
     </div>
 
@@ -580,14 +670,17 @@ c<!DOCTYPE html>
           </div>
         </div>
 
+        <div id="combat-stats-panel" class="combat-stats-panel">
+          <h3>Player Stats</h3>
+          <div class="combat-stat"><span>HP</span><strong id="home-stat-hp">100 / 100</strong></div>
+          <div class="combat-stat"><span>Damage</span><strong id="home-stat-damage">34</strong></div>
+          <div class="combat-stat"><span>Speed</span><strong id="home-stat-speed">8.0</strong></div>
+          <div class="combat-stat"><span>Equipped</span><strong id="home-stat-perk">None</strong></div>
+        </div>
+
         <div id="account-message" class="message-box">No operator signed in yet.</div>
       </div>
 
-      <div class="side-panel">
-        <a href="index.html" class="mini-btn primary">Play the Game</a>
-        <a href="login.html" class="mini-btn secondary">Sign In</a>
-        <a href="signup.html" class="mini-btn secondary">Create Account</a>
-      </div>
     </div>
 
     <div class="perk-panel">
@@ -600,6 +693,28 @@ c<!DOCTYPE html>
       </div>
 
       <div id="perk-items" class="perk-grid"></div>
+    </div>
+
+    <div class="perk-wheel-panel">
+      <div class="panel-header leaderboard-header">
+        <div>
+          <p class="eyebrow">Neon Shard protocol</p>
+          <h3>Perk Wheel</h3>
+        </div>
+        <span class="live-badge">1 shard / spin</span>
+      </div>
+      <div class="perk-wheel-content">
+        <div class="perk-wheel-stage">
+          <div class="perk-wheel-pointer" aria-hidden="true"></div>
+          <div id="perk-wheel" class="perk-wheel" aria-label="Perk wheel"></div>
+        </div>
+        <div class="perk-wheel-copy">
+          <h3>Roll the build</h3>
+          <p>Spend one Neon Shard to unlock a random perk. Duplicate perks convert into 5 Cubotics.</p>
+          <button id="spin-perk-wheel" class="perk-select" type="button">Spin Wheel</button>
+          <div id="perk-wheel-result" class="perk-wheel-result" aria-live="polite">Log in and earn Neon Shards from boss defeats.</div>
+        </div>
+      </div>
     </div>
 
     <div class="leaderboard-panel">
@@ -665,28 +780,128 @@ c<!DOCTYPE html>
     const leaderboardList = document.getElementById('leaderboard-list');
     const leaderboardTabs = document.querySelectorAll('.leaderboard-tab');
     const perkItemsEl = document.getElementById('perk-items');
+    const perkWheelEl = document.getElementById('perk-wheel');
+    const spinPerkWheelBtn = document.getElementById('spin-perk-wheel');
+    const perkWheelResult = document.getElementById('perk-wheel-result');
     const logoutBtn = document.getElementById('logout-btn');
     const loginLink = document.getElementById('login-link');
+    const signupLink = document.getElementById('signup-link');
+    const sideLoginLink = document.getElementById('side-login-link');
+    const sideSignupLink = document.getElementById('side-signup-link');
+    const sidePanel = document.querySelector('.side-panel');
+    const combatStatsPanel = document.getElementById('combat-stats-panel');
+    const homeStatHp = document.getElementById('home-stat-hp');
+    const homeStatDamage = document.getElementById('home-stat-damage');
+    const homeStatSpeed = document.getElementById('home-stat-speed');
+    const homeStatPerk = document.getElementById('home-stat-perk');
     const purchasedPerksKey = 'cube_assault_purchased_perks';
 
-    const perkItems = [
-      { id: 'fortified', name: 'Fortified Frame', tag: 'Survival', cost: 18, description: 'Boosts max health and keeps you standing longer in a difficult run.', cuboticsBonus: 500, cuboticsMultiplier: 1.05 },
-      { id: 'swift', name: 'Swift Step', tag: 'Mobility', cost: 16, description: 'Improves movement speed for safer repositioning and faster escapes.' },
-      { id: 'impact', name: 'Impact Rounds', tag: 'Offense', cost: 22, description: 'Raises damage output so heavy targets fall faster.' },
-      { id: 'aegis', name: 'Aegis Guard', tag: 'Defense', cost: 24, description: 'Adds extra armor to improve survivability against incoming damage.' },
-      { id: 'storm', name: 'Storm Sprint', tag: 'Mobility', cost: 30, description: 'Increases your movement and jump speed for aggressive positioning.' },
-      { id: 'overdrive', name: 'Overdrive Core', tag: 'Offense', cost: 34, description: 'Cranks up attack power so every hit lands harder and faster.' },
-      { id: 'guardian', name: 'Guardian Pulse', tag: 'Defense', cost: 26, description: 'Improves your resistance to incoming pressure during survival-heavy waves.' },
-      { id: 'phantom', name: 'Phantom Drift', tag: 'Mobility', cost: 28, description: 'Lets you move with more agility and reposition faster under fire.' },
-      { id: 'voltage', name: 'Voltage Edge', tag: 'Offense', cost: 32, description: 'Sharpens your melee strikes and increases attack effectiveness.' },
-      { id: 'starlit', name: 'Starlit Core', tag: 'Utility', cost: 36, description: 'Balances armor, damage, and movement for a more versatile build.' },
-      { id: 'berserker', name: 'Berserker Rites', tag: 'Offense', cost: 40, description: 'Pushes your attack damage higher for relentless aggression.' },
-      { id: 'sentinel', name: 'Sentinel Shell', tag: 'Defense', cost: 38, description: 'Adds durable protection that helps in longer survival runs.' },
-      { id: 'vanguard', name: 'Vanguard Pulse', tag: 'Defense', cost: 42, description: 'Adds heavier protection and steadier survivability for long pushes.' },
-      { id: 'cascade', name: 'Cascade Step', tag: 'Mobility', cost: 44, description: 'Improves movement fluidity for better dodges and faster repositioning.' },
-      { id: 'nova', name: 'Nova Striker', tag: 'Offense', cost: 46, description: 'Boosts your attack output for strong burst pressure against elite enemies.' },
-      { id: 'eclipse', name: 'Eclipse Guard', tag: 'Defense', cost: 48, description: 'Grants solid protective scaling for tougher incoming danger.' }
+    const perkRarities = [
+      { key: 'common', label: 'Casual', weight: 28, color: '#b8c2d9' },
+      { key: 'uncommon', label: 'Unsusal', weight: 24, color: '#6ee7b7' },
+      { key: 'rare', label: 'Rare', weight: 18, color: '#60a5fa' },
+      { key: 'epic', label: 'Epic', weight: 12, color: '#a78bfa' },
+      { key: 'legendary', label: 'Spactral', weight: 9, color: '#fbbf24' },
+      { key: 'mythic', label: 'Aether', weight: 6, color: '#f472b6' },
+      { key: 'ascended', label: 'Elusive', weight: 3, color: '#f97316' },
+      { key: 'transcendent', label: 'Celestial', weight: 1, color: '#fef08a' }
     ];
+
+    const perkItems = [
+      // Common: 7 perks
+      { id: 'common-1', name: 'Fortified Frame', tag: 'Survival', cost: 68, rarity: 'common', description: 'Boosts max health and keeps you standing longer in a difficult run.', cuboticsBonus: 500, cuboticsMultiplier: 1.05 },
+      { id: 'common-2', name: 'Swift Step', tag: 'Mobility', cost: 66, rarity: 'common', description: 'Improves movement speed for safer repositioning and faster escapes.' },
+      { id: 'common-3', name: 'Quick Draw', tag: 'Offense', cost: 67, rarity: 'common', description: 'Cuts recovery time between strikes so you can attack more often.' },
+      { id: 'common-4', name: 'Dust Guard', tag: 'Defense', cost: 69, rarity: 'common', description: 'Adds a slight reduction to incoming pressure during early waves.' },
+      { id: 'common-5', name: 'Cartographer', tag: 'Utility', cost: 65, rarity: 'common', description: 'Improves field awareness for tighter movement and safer positioning.' },
+      { id: 'common-6', name: 'Second Breath', tag: 'Survival', cost: 68, rarity: 'common', description: 'Helps recover faster after a bad fight and keeps you in motion longer.' },
+      { id: 'common-7', name: 'Spark Thread', tag: 'Utility', cost: 70, rarity: 'common', description: 'Makes your kit feel sharper and more responsive in hectic encounters.' },
+      { id: 'common-8', name: 'Rookie Resolve', tag: 'Survival', cost: 71, rarity: 'common', description: 'Adds a dependable starting boost for operators learning the arena.' },
+
+      // Uncommon: 7 perks
+      { id: 'uncommon-1', name: 'Brutal Impacts', tag: 'Offense', cost: 72, rarity: 'uncommon', description: 'Raises damage output so heavy targets fall faster.' },
+      { id: 'uncommon-2', name: 'Aegis Guard', tag: 'Defense', cost: 74, rarity: 'uncommon', description: 'Adds extra armor to improve survivability against incoming damage.' },
+      { id: 'uncommon-3', name: 'Guardian Pulse', tag: 'Defense', cost: 76, rarity: 'uncommon', description: 'Improves your resistance to incoming pressure during survival-heavy waves.' },
+      { id: 'uncommon-4', name: 'Trail Runner', tag: 'Mobility', cost: 73, rarity: 'uncommon', description: 'Lets you strafe and reposition with less effort under enemy fire.' },
+      { id: 'uncommon-5', name: 'Glass Breaker', tag: 'Offense', cost: 75, rarity: 'uncommon', description: 'Adds stronger burst damage to fragile targets and backline threats.' },
+      { id: 'uncommon-6', name: 'Steel Linings', tag: 'Defense', cost: 77, rarity: 'uncommon', description: 'Improves total durability so long runs feel less punishing.' },
+      { id: 'uncommon-7', name: 'Phase Dash', tag: 'Mobility', cost: 74, rarity: 'uncommon', description: 'Improves movement fluidity and helps you slip away from danger.' },
+      { id: 'uncommon-8', name: 'Arc Plating', tag: 'Defense', cost: 78, rarity: 'uncommon', description: 'Adds a reliable layer of protection for harder mid-game waves.' },
+
+      // Rare: 7 perks
+      { id: 'rare-1', name: 'Storm Sprint', tag: 'Mobility', cost: 80, rarity: 'rare', description: 'Increases your movement and jump speed for aggressive positioning.' },
+      { id: 'rare-2', name: 'Overdrive Core', tag: 'Offense', cost: 84, rarity: 'rare', description: 'Cranks up attack power so every hit lands harder and faster.' },
+      { id: 'rare-3', name: 'Phantom Drift', tag: 'Mobility', cost: 78, rarity: 'rare', description: 'Lets you move with more agility and reposition faster under fire.' },
+      { id: 'rare-4', name: 'Voltage Edge', tag: 'Offense', cost: 82, rarity: 'rare', description: 'Sharpens your melee strikes and increases attack effectiveness.' },
+      { id: 'rare-5', name: 'Mender Relay', tag: 'Utility', cost: 81, rarity: 'rare', description: 'Improves sustain and lets you recover more effectively after pressure.' },
+      { id: 'rare-6', name: 'Bastion Step', tag: 'Defense', cost: 85, rarity: 'rare', description: 'Improves stability while moving through crowded enemy packs.' },
+      { id: 'rare-7', name: 'Charge Lattice', tag: 'Offense', cost: 83, rarity: 'rare', description: 'Adds a sharper attack rhythm and stronger burst windows.' },
+      { id: 'rare-8', name: 'Thunder Mantle', tag: 'Defense', cost: 87, rarity: 'rare', description: 'Reinforces your defenses while keeping your combat rhythm aggressive.' },
+
+      // Epic: 7 perks
+      { id: 'epic-1', name: 'Starlit Core', tag: 'Utility', cost: 86, rarity: 'epic', description: 'Balances armor, damage, and movement for a more versatile build.' },
+      { id: 'epic-2', name: 'Berserker Rites', tag: 'Offense', cost: 90, rarity: 'epic', description: 'Pushes your attack damage higher for relentless aggression.' },
+      { id: 'epic-3', name: 'Sentinel Shell', tag: 'Defense', cost: 88, rarity: 'epic', description: 'Adds durable protection that helps in longer survival runs.' },
+      { id: 'epic-4', name: 'Nova Circuit', tag: 'Utility', cost: 89, rarity: 'epic', description: 'Boosts responsiveness and fights through heavy enemy pressure more smoothly.' },
+      { id: 'epic-5', name: 'Rift Walker', tag: 'Mobility', cost: 92, rarity: 'epic', description: 'Improves pacing and lets you reposition aggressively without losing tempo.' },
+      { id: 'epic-6', name: 'Iron Choir', tag: 'Defense', cost: 91, rarity: 'epic', description: 'Stabilizes your defenses and makes prolonged engagements easier.' },
+      { id: 'epic-7', name: 'Violet Surge', tag: 'Offense', cost: 93, rarity: 'epic', description: 'Integrates stronger offense with a faster attack cadence for serious pressure.' },
+      { id: 'epic-8', name: 'Astral Bastion', tag: 'Defense', cost: 95, rarity: 'epic', description: 'Creates a resilient combat shell for demanding elite encounters.' },
+
+      // Legendary: 7 perks
+      { id: 'legendary-1', name: 'Vanguard Defense', tag: 'Defense', cost: 92, rarity: 'legendary', description: 'Adds heavier protection and steadier survivability for long pushes.' },
+      { id: 'legendary-2', name: 'Cascade Step', tag: 'Mobility', cost: 94, rarity: 'legendary', description: 'Improves movement fluidity for better dodges and faster repositioning.' },
+      { id: 'legendary-3', name: 'Hammer Bloom', tag: 'Offense', cost: 95, rarity: 'legendary', description: 'Delivers devastating burst damage when a fight turns dangerous.' },
+      { id: 'legendary-4', name: 'Halo Guard', tag: 'Defense', cost: 96, rarity: 'legendary', description: 'Adds strong defensive layering and makes survival pushes much safer.' },
+      { id: 'legendary-5', name: 'Aether Thread', tag: 'Utility', cost: 93, rarity: 'legendary', description: 'Sharpen your counters and reward smart positioning with stronger execution.' },
+      { id: 'legendary-6', name: 'Flux Runner', tag: 'Mobility', cost: 97, rarity: 'legendary', description: 'Improves mobility and vertical control in crowded and chaotic fights.' },
+      { id: 'legendary-7', name: 'Last Stand', tag: 'Survival', cost: 98, rarity: 'legendary', description: 'Turns desperate situations into survivable windows with a stronger safety net.' },
+      { id: 'legendary-8', name: 'Crownstep', tag: 'Mobility', cost: 99, rarity: 'legendary', description: 'Combines precise movement with late-game control under heavy pressure.' },
+
+      // Mythic: 7 perks
+      { id: 'mythic-1', name: 'Nova Striker', tag: 'Offense', cost: 96, rarity: 'mythic', description: 'Boosts your attack output for strong burst pressure against elite enemies.' },
+      { id: 'mythic-2', name: 'Prism Tempest', tag: 'Offense', cost: 100, rarity: 'mythic', description: 'Creates explosive attack windows that punish elite enemies hard.' },
+      { id: 'mythic-3', name: 'Onyx Pulse', tag: 'Defense', cost: 99, rarity: 'mythic', description: 'Adds dramatically more resilience in heavy fire and bad rotations.' },
+      { id: 'mythic-4', name: 'Skybreak', tag: 'Mobility', cost: 102, rarity: 'mythic', description: 'Turns repositioning into a weapon by speeding up your movement and dodge timing.' },
+      { id: 'mythic-5', name: 'Storm Ritual', tag: 'Utility', cost: 101, rarity: 'mythic', description: 'Improves your consistency and rewards aggressive play with stronger payoff.' },
+      { id: 'mythic-6', name: 'Obsidian Echo', tag: 'Defense', cost: 103, rarity: 'mythic', description: 'Creates a heavier defensive layer during brutal boss phases and long fights.' },
+      { id: 'mythic-7', name: 'Chrono Bend', tag: 'Utility', cost: 104, rarity: 'mythic', description: 'Boosts your style and tempo, letting you act with more confidence under pressure.' },
+      { id: 'mythic-8', name: 'Voidbreaker', tag: 'Offense', cost: 106, rarity: 'mythic', description: 'Breaks through elite defenses with focused, high-impact attacks.' },
+
+      // Ascended: 7 perks
+      { id: 'ascended-1', name: 'Eclipse Guard', tag: 'Defense', cost: 98, rarity: 'ascended', description: 'Grants solid protective scaling for tougher incoming danger.' },
+      { id: 'ascended-2', name: 'Celestial Crown', tag: 'Utility', cost: 108, rarity: 'ascended', description: 'Perfects your build and sharpens your control over long, high-stakes fights.' },
+      { id: 'ascended-3', name: 'Nullfire Prime', tag: 'Offense', cost: 110, rarity: 'ascended', description: 'Delivers tremendous damage output and overwhelms elite enemies in seconds.' },
+      { id: 'ascended-4', name: 'Abyss Walker', tag: 'Mobility', cost: 107, rarity: 'ascended', description: 'Makes your movement feel unstoppable while maintaining control in every fight.' },
+      { id: 'ascended-5', name: 'Imperial Shell', tag: 'Defense', cost: 109, rarity: 'ascended', description: 'Adds a nearly impossible durability floor for late-game survival.' },
+      { id: 'ascended-6', name: 'Radiant Verdict', tag: 'Offense', cost: 112, rarity: 'ascended', description: 'Turns each attack into a decisive blow against the toughest enemies.' },
+      { id: 'ascended-7', name: 'Godline Core', tag: 'Utility', cost: 114, rarity: 'ascended', description: 'The ultimate build-defining perk for players chasing peak performance.' },
+      { id: 'ascended-8', name: 'Sovereign Guard', tag: 'Defense', cost: 116, rarity: 'ascended', description: 'Raises your defensive ceiling for the most punishing survival pushes.' },
+
+      // Transcendent: 7 perks
+      { id: 'transcendent-1', name: 'Absolute Edge', tag: 'Offense', cost: 120, rarity: 'transcendent', description: 'Delivers overwhelming damage against the arena\'s most dangerous targets.' },
+      { id: 'transcendent-2', name: 'Eternal Aegis', tag: 'Defense', cost: 122, rarity: 'transcendent', description: 'Provides an exceptional defensive foundation for impossible-looking fights.' },
+      { id: 'transcendent-3', name: 'Eventide Rush', tag: 'Mobility', cost: 124, rarity: 'transcendent', description: 'Turns every reposition into a controlled burst of speed and momentum.' },
+      { id: 'transcendent-4', name: 'Apex Circuit', tag: 'Utility', cost: 126, rarity: 'transcendent', description: 'Improves every part of your kit with refined high-tier performance.' },
+      { id: 'transcendent-5', name: 'Starfall Impact', tag: 'Offense', cost: 128, rarity: 'transcendent', description: 'Focuses devastating force into each decisive strike.' },
+      { id: 'transcendent-6', name: 'Infinite Shell', tag: 'Survival', cost: 130, rarity: 'transcendent', description: 'Gives late-game operators a powerful final layer of survivability.' },
+      { id: 'transcendent-7', name: 'Singularity Core', tag: 'Utility', cost: 132, rarity: 'transcendent', description: 'The rarest build catalyst for operators pursuing absolute mastery.' }
+    ];
+
+    function getRarityMeta(rarityKey) {
+      return perkRarities.find((rarity) => rarity.key === rarityKey) || perkRarities[0];
+    }
+
+    function getWeightedPerkPool() {
+      const weighted = [];
+      perkItems.forEach((item) => {
+        const meta = getRarityMeta(item.rarity);
+        for (let i = 0; i < (meta.weight || 1); i++) {
+          weighted.push(item);
+        }
+      });
+      return weighted;
+    }
 
     function getStoredAccount() {
       try {
@@ -705,6 +920,130 @@ c<!DOCTYPE html>
       }
     }
 
+    function syncEquippedPerk(account, perkId = null) {
+      if (!account) return;
+      const purchased = new Set(getPurchasedPerks());
+      const requestedPerk = perkId || account.activePerk;
+      const activePerk = purchased.has(requestedPerk) ? requestedPerk : null;
+
+      if (activePerk) {
+        account.activePerk = activePerk;
+        localStorage.setItem('cube_assault_perk', activePerk);
+      } else {
+        delete account.activePerk;
+        delete account.perkMultiplier;
+        localStorage.removeItem('cube_assault_perk');
+      }
+
+      localStorage.setItem(storageKey, JSON.stringify(account));
+    }
+
+    const homePerkAliases = {
+      'common-1': { hp: 18 }, 'common-2': { speed: 1.1 }, 'uncommon-1': { damage: 8 },
+      'uncommon-2': { hp: 28 }, 'uncommon-3': { hp: 22 }, 'rare-1': { speed: 1.8, jump: 1.8 },
+      'rare-2': { damage: 12 }, 'rare-3': { speed: 1.5, jump: 1.1 }, 'rare-4': { damage: 10 },
+      'epic-1': { hp: 12, speed: 0.8, damage: 6 }, 'epic-2': { damage: 16 }, 'epic-3': { hp: 26 },
+      'legendary-1': { hp: 30 }, 'legendary-2': { speed: 1.9, jump: 1.3 }, 'mythic-1': { damage: 14 },
+      'ascended-1': { hp: 24 },
+    };
+
+    function getHomeCombatStats() {
+      const account = getStoredAccount();
+      const purchased = new Set(getPurchasedPerks());
+      const perkId = purchased.has(account?.activePerk)
+        ? account.activePerk
+        : (purchased.has(localStorage.getItem('cube_assault_perk')) ? localStorage.getItem('cube_assault_perk') : null);
+      const item = perkItems.find((perk) => perk.id === perkId);
+      const [rarity, slotText] = String(perkId || '').split('-');
+      const slot = Math.max(1, Number(slotText) || 1);
+      const tier = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5, mythic: 6, ascended: 7, transcendent: 8 }[rarity] || 0;
+      const profile = (slot - 1) % 3;
+      const fallback = profile === 0
+        ? { hp: tier * 5 + slot }
+        : profile === 1
+          ? { damage: tier * 2 + slot }
+          : { speed: tier * 0.18 };
+      const modifier = homePerkAliases[perkId] || fallback;
+      return {
+        hp: 100 + (modifier.hp || 0),
+        damage: 34 + (modifier.damage || 0),
+        speed: 8 + (modifier.speed || 0),
+        perkName: item?.name || 'None',
+      };
+    }
+
+    function updateHomeCombatStats() {
+      const stats = getHomeCombatStats();
+      homeStatHp.textContent = `${stats.hp} / ${stats.hp}`;
+      homeStatDamage.textContent = String(stats.damage);
+      homeStatSpeed.textContent = stats.speed.toFixed(1);
+      homeStatPerk.textContent = stats.perkName;
+    }
+
+    window.addEventListener('storage', (event) => {
+      if ([storageKey, purchasedPerksKey, 'cube_assault_perk'].includes(event.key)) {
+        renderPerks();
+        loadAccount();
+        updateHomeCombatStats();
+      }
+    });
+
+    let perkWheelSpinning = false;
+
+    function updatePerkWheelState() {
+      const account = getStoredAccount();
+      const shards = Number(account?.neonShards || 0);
+      spinPerkWheelBtn.disabled = !account || shards < 1 || perkWheelSpinning;
+      spinPerkWheelBtn.textContent = account ? `Spin Wheel (${shards} Shard${shards === 1 ? '' : 's'})` : 'Log In to Spin';
+    }
+
+    function spinPerkWheel() {
+      if (perkWheelSpinning) return;
+      const account = getStoredAccount();
+      const shards = Number(account?.neonShards || 0);
+      if (!account) {
+        perkWheelResult.textContent = 'Log in to use the Perk Wheel.';
+        return;
+      }
+      if (shards < 1) {
+        perkWheelResult.textContent = 'Earn a Neon Shard by defeating a boss.';
+        return;
+      }
+
+      perkWheelSpinning = true;
+      updatePerkWheelState();
+      account.neonShards = shards - 1;
+      const purchased = getPurchasedPerks();
+      const available = perkItems.filter((item) => !purchased.includes(item.id));
+      const pool = available.length ? getWeightedPerkPool().filter((item) => available.includes(item)) : getWeightedPerkPool();
+      const winner = pool[Math.floor(Math.random() * pool.length)];
+      const winnerIndex = perkItems.findIndex((item) => item.id === winner.id);
+      const segmentAngle = 360 / perkItems.length;
+      const targetRotation = 1440 + (360 - (winnerIndex * segmentAngle + segmentAngle / 2));
+      perkWheelEl.style.transform = `rotate(${targetRotation}deg)`;
+      perkWheelResult.textContent = `Rolling ${getRarityMeta(winner.rarity).label} rarity...`;
+
+      window.setTimeout(() => {
+        const nextPurchased = purchased.includes(winner.id) ? purchased : [...purchased, winner.id];
+        localStorage.setItem(purchasedPerksKey, JSON.stringify(nextPurchased));
+        if (purchased.includes(winner.id)) {
+          account.cubotics = Number(account.cubotics || 0) + 5;
+          perkWheelResult.textContent = `Duplicate: ${winner.name}. +5 Cubotics.`;
+        } else {
+          perkWheelResult.textContent = `${winner.name} unlocked. It is ready to equip.`;
+        }
+        localStorage.setItem(storageKey, JSON.stringify(account));
+        syncAccountCuboticsToServer(account.cubotics, account.neonShards);
+        loadAccount();
+        renderPerks();
+        updatePerkWheelState();
+        perkWheelSpinning = false;
+        updatePerkWheelState();
+      }, 3250);
+    }
+
+    spinPerkWheelBtn.addEventListener('click', spinPerkWheel);
+
     function escapeHtml(str) {
       return String(str)
         .replace(/&/g, '&amp;')
@@ -714,7 +1053,7 @@ c<!DOCTYPE html>
         .replace(/'/g, '&#39;');
     }
 
-    async function syncAccountCuboticsToServer(cuboticsValue) {
+    async function syncAccountCuboticsToServer(cuboticsValue, neonShardsValue = null) {
       const account = getStoredAccount();
       if (!account?.username) return;
 
@@ -722,11 +1061,12 @@ c<!DOCTYPE html>
         const response = await fetch(`${apiBase}/api/update-score`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: account.username, cubotics: Number(cuboticsValue || 0) })
+          body: JSON.stringify({ username: account.username, cubotics: Number(cuboticsValue || 0), ...(neonShardsValue === null ? {} : { neonShards: Number(neonShardsValue || 0) }) })
         });
         const result = await response.json().catch(() => null);
         if (result?.success && typeof result.cubotics === 'number') {
           account.cubotics = result.cubotics;
+          if (typeof result.neonShards === 'number') account.neonShards = result.neonShards;
           localStorage.setItem(storageKey, JSON.stringify(account));
         }
       } catch (error) {
@@ -756,7 +1096,8 @@ c<!DOCTYPE html>
         const canAfford = balance >= costInCubotics;
 
         // build tooltip with description, cost and any bonuses
-        let tooltip = `${item.description} Cost: ${item.cost} Cubotics.`;
+        const rarityMeta = getRarityMeta(item.rarity);
+        let tooltip = `${item.description} Cost: ${item.cost} Cubotics. Rarity: ${rarityMeta.label}.`;
         if (typeof item.cuboticsBonus === 'number') tooltip += ` Immediate bonus: ${item.cuboticsBonus} score.`;
         if (typeof item.cuboticsMultiplier === 'number') tooltip += ` Multiplier: ${item.cuboticsMultiplier}.`;
         const esc = escapeHtml(tooltip);
@@ -771,6 +1112,7 @@ c<!DOCTYPE html>
           </div>
           <p>${item.description}</p>
           <div class="perk-meta">
+            <span class="perk-badge" style="color:${rarityMeta.color};border-color:${rarityMeta.color};">${rarityMeta.label}</span>
             <span class="perk-badge">${item.tag}</span>
             <span class="perk-cost">${item.cost} C</span>
           </div>
@@ -815,7 +1157,7 @@ c<!DOCTYPE html>
               }
 
               // save and equip by default after purchase
-              acct.activePerk = item.id;
+              syncEquippedPerk(acct, item.id);
               if (typeof item.cuboticsMultiplier === 'number') {
                 acct.perkMultiplier = item.cuboticsMultiplier;
               }
@@ -832,7 +1174,7 @@ c<!DOCTYPE html>
           // already purchased -> equip
           const acct2 = acct || getStoredAccount();
           if (acct2) {
-            acct2.activePerk = item.id;
+            syncEquippedPerk(acct2, item.id);
             if (typeof item.cuboticsMultiplier === 'number') {
               acct2.perkMultiplier = item.cuboticsMultiplier;
             }
@@ -840,13 +1182,35 @@ c<!DOCTYPE html>
             accountMessage.textContent = `${item.name} equipped.`;
           }
 
-          localStorage.setItem('cube_assault_perk', item.id);
+          syncEquippedPerk(acct2, item.id);
           renderPerks();
+          updateHomeCombatStats();
           showToast(`${item.name} equipped`);
         });
 
         perkItemsEl.appendChild(card);
       });
+    }
+
+    function updateLoginPromptVisibility(isLoggedIn) {
+      const loginLinks = [loginLink, sideLoginLink, signupLink, sideSignupLink].filter(Boolean);
+      loginLinks.forEach((link) => {
+        link.style.display = isLoggedIn ? 'none' : '';
+      });
+
+      if (sidePanel) {
+        sidePanel.style.display = '';
+      }
+      if (combatStatsPanel) {
+        combatStatsPanel.style.display = isLoggedIn ? 'grid' : 'none';
+      }
+      updateHomeCombatStats();
+
+      if (perkWheelResult) {
+        perkWheelResult.textContent = isLoggedIn
+          ? 'Earn Neon Shards from boss defeats.'
+          : 'Log in and earn Neon Shards from boss defeats.';
+      }
     }
 
     function loadAccount() {
@@ -860,6 +1224,8 @@ c<!DOCTYPE html>
         accountStatus.textContent = 'Offline';
         accountMessage.textContent = 'Create an account or log in to sync your profile and Cubotics balance.';
         if (loginLink) loginLink.textContent = 'LOG IN';
+        updateLoginPromptVisibility(false);
+        updatePerkWheelState();
         return null;
       }
 
@@ -877,6 +1243,7 @@ c<!DOCTYPE html>
         } catch (e) {
           // ignore ownership validation errors
         }
+        syncEquippedPerk(account);
         accountTitle.textContent = `${account.username || 'Operator'}'s profile`;
         accountUsername.textContent = account.username || 'Unknown';
         accountEmail.textContent = account.email || 'No email registered';
@@ -886,6 +1253,8 @@ c<!DOCTYPE html>
         accountStatus.textContent = 'Online';
         accountMessage.textContent = 'Welcome back, operator. Your Cubotics are synced and ready.' + (account.activePerk ? ` Equipped: ${account.activePerk.replace(/[-_]/g,' ')}.` : '');
         if (loginLink) loginLink.textContent = 'VIEW ACCOUNT';
+        updateLoginPromptVisibility(true);
+        updatePerkWheelState();
         return account;
       } catch (error) {
         accountMessage.textContent = 'Saved account data is invalid. Please log in again.';
@@ -973,6 +1342,7 @@ c<!DOCTYPE html>
       accountStatus.textContent = 'Offline';
       accountMessage.textContent = 'You have been logged out. Sign in again to continue.';
       if (loginLink) loginLink.textContent = 'LOG IN';
+      updateLoginPromptVisibility(false);
     });
 
     const starfield = document.getElementById('starfield');

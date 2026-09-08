@@ -111,10 +111,10 @@ async function handleUpdateScore(request, env) {
   }
 
   await ensureUserTable(env);
-  await env.DB.prepare('UPDATE users SET Cubotics = MAX(COALESCE(Cubotics, 0), ?) WHERE username = ?')
+  await env.DB.prepare('UPDATE users SET Cubotics = ? WHERE username = ?')
     .bind(cubotics, username)
     .run();
-  await env.DB.prepare('UPDATE users SET NeonShards = MAX(COALESCE(NeonShards, 0), ?) WHERE username = ?')
+  await env.DB.prepare('UPDATE users SET NeonShards = ? WHERE username = ?')
     .bind(neonShards, username)
     .run();
 

@@ -44,6 +44,95 @@ backgroundMusic.volume = 0.45;
 let backgroundMusicStarted = false;
 let musicEnabled = true;
 
+const sfx = {
+  ctx: null,
+  enabled: true,
+};
+
+function ensureAudioContext() {
+  if (!sfx.enabled) return null;
+  const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextConstructor) return null;
+  if (!sfx.ctx) sfx.ctx = new AudioContextConstructor();
+  if (sfx.ctx.state === 'suspended') sfx.ctx.resume().catch(() => {});
+  return sfx.ctx;
+}
+
+function playSfx(type = 'shot') {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+
+  const start = ctx.currentTime;
+  const sounds = {
+    shot: { frequency: 180, endFrequency: 80, duration: 0.055, type: 'square', volume: 0.035, attack: 0.003 },
+    enemyHit: { frequency: 140, endFrequency: 60, duration: 0.08, type: 'square', volume: 0.023, attack: 0.002 },
+    enemyDown: { frequency: 110, endFrequency: 34, duration: 0.14, type: 'sawtooth', volume: 0.04, attack: 0.01 },
+    explosion: { frequency: 80, endFrequency: 26, duration: 0.28, type: 'sawtooth', volume: 0.045, attack: 0.006 },
+    playerHit: { frequency: 120, endFrequency: 40, duration: 0.10, type: 'triangle', volume: 0.03, attack: 0.001 },
+    pickup: { frequency: 440, endFrequency: 720, duration: 0.045, type: 'triangle', volume: 0.025, attack: 0.002 },
+    reflect: { frequency: 550, endFrequency: 360, duration: 0.08, type: 'square', volume: 0.025, attack: 0.002 },
+    bossShot: { frequency: 140, endFrequency: 70, duration: 0.09, type: 'sawtooth', volume: 0.035, attack: 0.002 },
+    spawn: { frequency: 420, endFrequency: 180, duration: 0.09, type: 'triangle', volume: 0.025, attack: 0.004 },
+  };
+
+  const options = sounds[type] || sounds.shot;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+
+  osc.type = options.type;
+  osc.frequency.setValueAtTime(options.frequency, start);
+  osc.frequency.linearRampToValueAtTime(options.endFrequency, start + Math.max(0.01, options.duration));
+
+  filter.frequency.setValueAtTime(900 + options.frequency * 4, start);
+  filter.Q.setValueAtTime(1.2, start);
+
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.linearRampToValueAtTime(options.volume, start + options.attack);
+  gain.gain.linearRampToValueAtTime(0.0001, start + options.duration);
+
+  osc.connect(filter).connect(gain).connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + options.duration + 0.015);
+}
+
+function makeVfxBurst(position, color = 0xffd36b, count = 10, size = 0.12) {
+  for (let i = 0; i < count; i += 1) {
+    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.82 });
+    const fragment = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), material);
+    fragment.position.copy(position).add(new THREE.Vector3(
+      (Math.random() - 0.5) * 1.2,
+      Math.random() * 0.8 + 0.2,
+      (Math.random() - 0.5) * 1.2
+    ));
+    fragment.userData.velocity = new THREE.Vector3(
+      (Math.random() - 0.5) * 4.5,
+      Math.random() * 3.2 + 1.4,
+      (Math.random() - 0.5) * 4.5
+    );
+    fragment.userData.life = 0.55 + Math.random() * 0.4;
+    fragment.userData.maxLife = fragment.userData.life;
+    scene.add(fragment);
+    fragments.push(fragment);
+  }
+}
+
+function makeVfxShockwave(position, color = 0xffa44d, radius = 1.5) {
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(radius * 0.2, radius, 24),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })
+  );
+  ring.position.copy(position);
+  ring.position.y = Math.max(position.y, 1.2);
+  ring.rotation.x = -Math.PI / 2;
+  ring.userData.velocity = new THREE.Vector3(0, 0, 0);
+  ring.userData.life = 0.36;
+  ring.userData.maxLife = 0.36;
+  ring.userData.radius = radius;
+  scene.add(ring);
+  fragments.push(ring);
+}
+
 function startBackgroundMusic() {
   if (!musicEnabled || backgroundMusicStarted) return;
   backgroundMusicStarted = true;
@@ -277,6 +366,8 @@ scene.add(floor);
 const baseplateTop = floor.position.y + 0.5;
 
 const walls = [];
+const wallHitboxes = [];
+const floorHitbox = new THREE.Box3().setFromObject(floor);
 const boundaryMaterial = new THREE.MeshStandardMaterial({
   color: 0x0d0d18,
   emissive: 0x0d1d2d,
@@ -300,6 +391,8 @@ function addBlock(x, z, width, height, depth) {
   mesh.receiveShadow = true;
   scene.add(mesh);
   walls.push(mesh);
+  mesh.updateMatrixWorld(true);
+  wallHitboxes.push(new THREE.Box3().setFromObject(mesh));
 }
 
 addBlock(0, -40, 90, 6, 4);
@@ -316,6 +409,8 @@ function addColumn(x, z) {
   col.receiveShadow = true;
   scene.add(col);
   walls.push(col);
+  col.updateMatrixWorld(true);
+  wallHitboxes.push(new THREE.Box3().setFromObject(col));
 }
 
 addColumn(-18, -18);
@@ -330,27 +425,11 @@ arch.position.set(0, archHeight - 0.1, -26);
 arch.castShadow = true;
 arch.receiveShadow = true;
 scene.add(arch);
+walls.push(arch);
+arch.updateMatrixWorld(true);
+wallHitboxes.push(new THREE.Box3().setFromObject(arch));
 addBlock(-5.8, -26, 3.5, 5.5, 3.5);
 addBlock(5.8, -26, 3.5, 5.5, 3.5);
-
-function addRubble(x, z) {
-  const group = new THREE.Group();
-  for (let i = 0; i < 4; i++) {
-    const size = 0.6 + Math.random() * 0.8;
-    const stone = new THREE.Mesh(new THREE.BoxGeometry(size, size * 0.5, size), new THREE.MeshStandardMaterial({ color: 0x6d593d, roughness: 0.9, metalness: 0.02 }));
-    stone.position.set((Math.random() - 0.5) * 2, 0.2 + i * 0.16, (Math.random() - 0.5) * 2);
-    stone.rotation.y = Math.random() * Math.PI;
-    stone.castShadow = true;
-    stone.receiveShadow = true;
-    group.add(stone);
-  }
-  group.position.set(x, 0, z);
-  scene.add(group);
-  walls.push(...group.children);
-}
-addRubble(-20, 10);
-addRubble(22, -8);
-addRubble(8, 22);
 
 const mossMaterial = new THREE.MeshStandardMaterial({ color: 0x5d6c31, roughness: 0.96, metalness: 0.02 });
 for (const pos of [{ x: 18, z: 10 }, { x: -9, z: 5 }, { x: 6, z: -14 }]) {
@@ -366,6 +445,9 @@ let score = 0;
 let neonShards = 0;
 const savedAccount = getStoredAccount();
 neonShards = Number(savedAccount?.neonShards || 0);
+if (savedAccount?.activePerk) {
+  localStorage.setItem('cube_assault_perk', savedAccount.activePerk);
+}
 let waveActive = false;
 let waveDelayTimer = 0;
 let gameOver = false;
@@ -382,7 +464,7 @@ const waves = [
   { numEnemies: 5, baseHealth: 100, healthVariance: 30, baseSpeed: 3, speedVariance: 1, spawnRadius: 25, color: 0xff4444, scale: 1 },
   { numEnemies: 7, baseHealth: 120, healthVariance: 40, baseSpeed: 3.5, speedVariance: 1.5, spawnRadius: 30, color: 0xff4444, scale: 1 },
   { numEnemies: 10, baseHealth: 150, healthVariance: 50, baseSpeed: 4, speedVariance: 2, spawnRadius: 35, color: 0xff4444, scale: 1 },
-  { numEnemies: 1, baseHealth: 1000, healthVariance: 0, baseSpeed: 2, speedVariance: 0, spawnRadius: 10, color: 0xaa00ff, scale: 4, emissiveColor: 0xff88ff }, // BOSS ROUND
+  { numEnemies: 1, baseHealth: 1000, healthVariance: 0, baseSpeed: 2, speedVariance: 0, spawnRadius: 10, color: 0xaa00ff, scale: 1.8, emissiveColor: 0xff88ff }, // BOSS ROUND
   // Add more waves as desired
 ];
 
@@ -681,29 +763,46 @@ function startNextWave() {
       enemyType = 'heavy';
     } else if (i % 5 === 2) {
       enemyType = 'light';
+    } else if (i % 5 === 4) {
+      enemyType = 'shield';
+    } else if (i % 7 === 6) {
+      enemyType = 'flying';
+    } else if (i % 7 === 5) {
+      enemyType = 'teleporter';
+    } else if (i % 9 === 8) {
+      enemyType = 'conjoined';
+    } else if (i % 11 === 10) {
+      enemyType = 'secondlife';
+    } else if (i % 13 === 12) {
+      enemyType = 'exploding';
     }
 
-    let spawnX, spawnZ;
+    let spawnX = 0;
+    let spawnZ = 0;
     let attempts = 0;
-    const MAX_SPAWN_ATTEMPTS = 50; // Prevent infinite loops if no valid spawn point exists
+    const MAX_SPAWN_ATTEMPTS = 200;
+    const spawnScale = wave.scale * (getEnemyVariantConfig(enemyType, wave.color, emissiveColor).scaleMultiplier || 1);
 
     do {
-      spawnX = (Math.random() - 0.5) * wave.spawnRadius * 2;
-      spawnZ = (Math.random() - 0.5) * wave.spawnRadius * 2;
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 10 + Math.random() * Math.max(8, wave.spawnRadius);
+      spawnX = Math.cos(angle) * distance;
+      spawnZ = Math.sin(angle) * distance;
 
       attempts++;
       if (attempts > MAX_SPAWN_ATTEMPTS) {
-        console.warn("Could not find a valid spawn point for enemy after multiple attempts. Spawning at (0,0).");
+        console.warn('Could not find a valid spawn point for enemy after multiple attempts. Spawning at safe fallback.');
         spawnX = 0;
         spawnZ = 0;
-        break; // Exit loop to prevent infinite attempts
+        break;
       }
-
     } while (
-      player.position.distanceTo(new THREE.Vector3(spawnX, player.position.y, spawnZ)) < 15 || // Ensure not too close to player
-      checkEnemyCollisionAtPosition(spawnX, 1.3, spawnZ, wave.scale) // Check collision with walls
+      player.position.distanceTo(new THREE.Vector3(spawnX, player.position.y, spawnZ)) < 15 ||
+      Math.abs(spawnX) > 36 ||
+      Math.abs(spawnZ) > 36 ||
+      checkEnemyCollisionAtPosition(spawnX, 1.3, spawnZ, spawnScale, enemyType) ||
+      checkEnemySpawnOverlap(spawnX, 1.3, spawnZ, spawnScale, enemyType)
     );
-
 
     createEnemy(spawnX, spawnZ, health, speed, wave.color, wave.scale, emissiveColor, enemyType);
   }
@@ -881,6 +980,7 @@ function getEnemyVariantConfig(type, color, emissiveColor) {
         scaleMultiplier: 1.14,
         healthMultiplier: 1.9,
         speedMultiplier: 0.75,
+        ATM: 5,
       };
     case 'light':
       return {
@@ -915,23 +1015,134 @@ function getEnemyVariantConfig(type, color, emissiveColor) {
         scaleMultiplier: 1,
         healthMultiplier: 1.5,
         speedMultiplier: 0.9,
+        ATM: 4,
+      };
+    case 'shield':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(1.05, 1.2, 1.05),
+        bodyColor: 0x3b526d,
+        bodyEmissive: 0x102a45,
+        bodyEmissiveIntensity: 0.5,
+        armGeometry: new THREE.BoxGeometry(0.24, 0.76, 0.24),
+        armColor: 0x30445b,
+        armEmissive: 0x0d2035,
+        armEmissiveIntensity: 0.3,
+        legGeometry: new THREE.BoxGeometry(0.3, 0.84, 0.3),
+        legColor: 0x202b39,
+        eyeColor: 0xffe08a,
+        scaleMultiplier: 1,
+        healthMultiplier: 1,
+        fixedHealth: 150,
+        shieldHealth: 100,
+        speedMultiplier: 0.82,
+      };
+    case 'flying':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(0.95, 0.95, 0.95),
+        bodyColor: 0x9b7cff,
+        bodyEmissive: 0x32176b,
+        bodyEmissiveIntensity: 0.85,
+        armGeometry: new THREE.BoxGeometry(0.2, 0.58, 0.2),
+        armColor: 0x7357c7,
+        armEmissive: 0x24124f,
+        armEmissiveIntensity: 0.5,
+        legGeometry: new THREE.BoxGeometry(0.24, 0.66, 0.24),
+        legColor: 0x211a3a,
+        eyeColor: 0xfff1a8,
+        scaleMultiplier: 0.9,
+        healthMultiplier: 1,
+        fixedHealth: 200,
+        speedMultiplier: 0.9,
+      };
+    case 'teleporter':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(0.98, 1.1, 0.98),
+        bodyColor: 0xff63c8,
+        bodyEmissive: 0x5b123f,
+        bodyEmissiveIntensity: 0.85,
+        armGeometry: new THREE.BoxGeometry(0.22, 0.7, 0.22),
+        armColor: 0xd947a4,
+        armEmissive: 0x42102f,
+        armEmissiveIntensity: 0.5,
+        legGeometry: new THREE.BoxGeometry(0.28, 0.78, 0.28),
+        legColor: 0x35152f,
+        eyeColor: 0xffffff,
+        scaleMultiplier: 1,
+        healthMultiplier: 1,
+        fixedHealth: 150,
+        speedMultiplier: 1,
+      };
+    case 'conjoined':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(1.15, 1.15, 1.1),
+        bodyColor: 0xff5d5d,
+        bodyEmissive: 0x4a1010,
+        bodyEmissiveIntensity: 0.45,
+        armGeometry: new THREE.BoxGeometry(0.25, 0.72, 0.25),
+        armColor: 0xd84949,
+        armEmissive: 0x321010,
+        armEmissiveIntensity: 0.25,
+        legGeometry: new THREE.BoxGeometry(0.3, 0.82, 0.3),
+        legColor: 0x33252a,
+        eyeColor: 0xfff0c2,
+        scaleMultiplier: 1.08,
+        healthMultiplier: 1,
+        fixedHealth: 150,
+        speedMultiplier: 0.88,
+      };
+    case 'secondlife':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(1.05, 1.15, 1.05),
+        bodyColor: 0xb6ff68,
+        bodyEmissive: 0x234d12,
+        bodyEmissiveIntensity: 0.7,
+        armGeometry: new THREE.BoxGeometry(0.24, 0.72, 0.24),
+        armColor: 0x79c442,
+        armEmissive: 0x18370c,
+        armEmissiveIntensity: 0.35,
+        legGeometry: new THREE.BoxGeometry(0.28, 0.8, 0.28),
+        legColor: 0x263b1d,
+        eyeColor: 0xffffff,
+        scaleMultiplier: 1,
+        healthMultiplier: 1,
+        fixedHealth: 150,
+        speedMultiplier: 0.94,
+      };
+    case 'exploding':
+      return {
+        bodyGeometry: new THREE.BoxGeometry(0.9, 0.9, 0.9),
+        bodyColor: 0xff8a3d,
+        bodyEmissive: 0x6b1e08,
+        bodyEmissiveIntensity: 0.9,
+        armGeometry: new THREE.BoxGeometry(0.2, 0.62, 0.2),
+        armColor: 0xe65f2d,
+        armEmissive: 0x4d1708,
+        armEmissiveIntensity: 0.45,
+        legGeometry: new THREE.BoxGeometry(0.24, 0.7, 0.24),
+        legColor: 0x3b2119,
+        eyeColor: 0xfff0b3,
+        scaleMultiplier: 0.9,
+        healthMultiplier: 1,
+        fixedHealth: 50,
+        speedMultiplier: 1.15,
       };
     case 'boss':
       return {
-        bodyGeometry: new THREE.BoxGeometry(1.7, 0.8, 2.2),
+        bodyGeometry: new THREE.BoxGeometry(1.2, 0.7, 1.6),
         bodyColor: color,
         bodyEmissive: emissiveColor,
         bodyEmissiveIntensity: 0.75,
-        armGeometry: new THREE.BoxGeometry(0.32, 0.55, 0.5),
+        armGeometry: new THREE.BoxGeometry(0.26, 0.48, 0.42),
         armColor: color,
         armEmissive: emissiveColor,
         armEmissiveIntensity: 0.55,
-        legGeometry: new THREE.BoxGeometry(0.38, 0.45, 0.8),
+        legGeometry: new THREE.BoxGeometry(0.28, 0.38, 0.6),
         legColor: 0x333333,
         eyeColor: 0x000000,
         scaleMultiplier: 1,
         healthMultiplier: 1,
         speedMultiplier: 1,
+        ATM: 10,
       };
     default:
       return {
@@ -993,6 +1204,19 @@ function updateHeavyRamMarker(enemy) {
   marker.material.color.setHex(enemy.userData.ramState === 'charge' ? 0xff2d2d : 0xff8a5b);
 }
 
+function getEffectiveATM(enemy) {
+  const baseATM = Number(enemy?.userData?.ATM || 0);
+  if (baseATM <= 0) return 0;
+  const difficultyScale = 1 + Math.max(0, currentRound - 1) * 0.12;
+  return Math.max(0.5, baseATM / difficultyScale);
+}
+
+function getAbilityCooldown(enemy, minimumSeconds = 0) {
+  const effectiveATM = getEffectiveATM(enemy);
+  if (effectiveATM <= 0) return minimumSeconds;
+  return Math.max(minimumSeconds, 60 / effectiveATM);
+}
+
 function handleHeavyRamAttack(enemy, delta, currentScale) {
   if (enemy.userData.variant !== 'heavy') return false;
 
@@ -1024,7 +1248,7 @@ function handleHeavyRamAttack(enemy, delta, currentScale) {
     if (checkEnemyCollision(enemy)) {
       enemy.position.x = oldPos.x;
       enemy.userData.ramState = 'cooldown';
-      enemy.userData.ramCooldown = 2.8;
+      enemy.userData.ramCooldown = getAbilityCooldown(enemy, 2.8);
       updateHeavyRamMarker(enemy);
       return true;
     }
@@ -1033,7 +1257,7 @@ function handleHeavyRamAttack(enemy, delta, currentScale) {
     if (checkEnemyCollision(enemy)) {
       enemy.position.z = oldPos.z;
       enemy.userData.ramState = 'cooldown';
-      enemy.userData.ramCooldown = 2.8;
+      enemy.userData.ramCooldown = getAbilityCooldown(enemy, 2.8);
       updateHeavyRamMarker(enemy);
       return true;
     }
@@ -1044,14 +1268,14 @@ function handleHeavyRamAttack(enemy, delta, currentScale) {
       damagePlayer(18);
       player.damageCooldown = 1.1;
       enemy.userData.ramState = 'cooldown';
-      enemy.userData.ramCooldown = 3.2;
+      enemy.userData.ramCooldown = getAbilityCooldown(enemy, 3.2);
       updateHeavyRamMarker(enemy);
       return true;
     }
 
     if (enemy.userData.ramChargeTime <= 0) {
       enemy.userData.ramState = 'cooldown';
-      enemy.userData.ramCooldown = 3.0;
+      enemy.userData.ramCooldown = getAbilityCooldown(enemy, 3.0);
     }
 
     updateHeavyRamMarker(enemy);
@@ -1074,7 +1298,7 @@ function handleHeavyRamAttack(enemy, delta, currentScale) {
     enemy.userData.ramState = 'windup';
     enemy.userData.ramWindup = 1.05;
     enemy.userData.ramDirection = toPlayer.normalize();
-    enemy.userData.ramCooldown = 3.7;
+    enemy.userData.ramCooldown = getAbilityCooldown(enemy, 3.7);
     updateHeavyRamMarker(enemy);
     return true;
   }
@@ -1085,7 +1309,7 @@ function handleHeavyRamAttack(enemy, delta, currentScale) {
 function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1, emissiveColor = 0x000000, type = 'normal') {
   const group = new THREE.Group();
   const variant = getEnemyVariantConfig(type, color, emissiveColor);
-  const scaledHealth = health * (variant.healthMultiplier || 1);
+  const scaledHealth = variant.fixedHealth || health * (variant.healthMultiplier || 1);
   const scaledSpeed = speed * (variant.speedMultiplier || 1);
   const scaledBaseScale = scale * (variant.scaleMultiplier || 1);
 
@@ -1099,6 +1323,26 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   body.castShadow = true;
   body.receiveShadow = true;
   group.add(body);
+
+  if (type === 'conjoined') {
+    const lightBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.78, 0.86, 0.84),
+      new THREE.MeshStandardMaterial({ color: 0x7edbff, emissive: 0x0e2c47, emissiveIntensity: 0.45 })
+    );
+    lightBody.position.set(0.58, 0.12, 0.02);
+    lightBody.scale.setScalar(0.9);
+    lightBody.castShadow = true;
+    lightBody.receiveShadow = true;
+    group.add(lightBody);
+    group.userData.fusionBody = lightBody;
+
+    const fusionEye = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.16, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0xf9ffff, emissive: 0x7edbff, emissiveIntensity: 0.8 })
+    );
+    fusionEye.position.set(0.58, 0.3, 0.42);
+    group.add(fusionEye);
+  }
 
   // Arms
   const armMat = new THREE.MeshStandardMaterial({
@@ -1127,18 +1371,35 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   group.add(rightLeg);
 
   if (type === 'boss') {
-    leftArm.visible = false;
-    rightArm.visible = false;
-    leftLeg.visible = false;
-    rightLeg.visible = false;
+    group.remove(leftArm, rightArm, leftLeg, rightLeg);
+
     const trackMat = new THREE.MeshStandardMaterial({ color: 0x202938, roughness: 0.85, metalness: 0.7 });
     for (const x of [-0.95, 0.95]) {
       const track = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 1.75), trackMat);
-      track.position.set(x, -0.42, 0);
+      track.position.set(x, -0.47, 0);
       track.castShadow = true;
       track.receiveShadow = true;
       group.add(track);
     }
+
+    const sideArmorMat = new THREE.MeshStandardMaterial({ color: 0x304158, emissive: 0x0b1121, emissiveIntensity: 0.4, metalness: 0.8, roughness: 0.45 });
+    const sidePanelLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.38, 1.2), sideArmorMat);
+    sidePanelLeft.position.set(-0.78, 0.04, 0);
+    sidePanelLeft.castShadow = true;
+    group.add(sidePanelLeft);
+    const sidePanelRight = sidePanelLeft.clone();
+    sidePanelRight.position.x = 0.78;
+    group.add(sidePanelRight);
+
+    const cannonMat = new THREE.MeshStandardMaterial({ color: 0x929ca8, emissive: 0x13202e, emissiveIntensity: 0.3, metalness: 0.9, roughness: 0.4 });
+    const leftCannon = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.2, 10), cannonMat);
+    leftCannon.rotation.x = Math.PI / 2;
+    leftCannon.position.set(-0.92, 0.12, -0.7);
+    leftCannon.castShadow = true;
+    group.add(leftCannon);
+    const rightCannon = leftCannon.clone();
+    rightCannon.position.x = 0.92;
+    group.add(rightCannon);
 
     const turret = new THREE.Mesh(
       new THREE.CylinderGeometry(0.72, 0.82, 0.38, 8),
@@ -1148,6 +1409,9 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
     turret.position.set(0, 0.48, 0);
     turret.castShadow = true;
     group.add(turret);
+
+    group.userData.leftCannon = leftCannon;
+    group.userData.rightCannon = rightCannon;
   }
 
   if (type === 'necromancer') {
@@ -1182,19 +1446,37 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   rightEye.position.set(type === 'light' ? 0.18 : type === 'necromancer' ? 0.2 : 0.25, 0.2, 0.51);
   group.add(rightEye);
   const mouthGeo = type === 'boss'
-    ? new THREE.CylinderGeometry(0.2, 0.25, 0.8, 12)
+    ? new THREE.CylinderGeometry(0.14, 0.2, 0.72, 12)
     : new THREE.BoxGeometry(type === 'light' ? 0.34 : type === 'necromancer' ? 0.42 : 0.5, 0.1, 0.1);
   const mouth = new THREE.Mesh(mouthGeo, type === 'boss'
     ? new THREE.MeshStandardMaterial({ color: 0x151b28, emissive: 0xff4d3d, emissiveIntensity: 1.2, metalness: 0.8, roughness: 0.35 })
     : eyeMat);
   if (type === 'boss') {
-    mouth.rotation.x = -Math.PI / 2;
-    mouth.position.set(0, 0.55, -1.35);
+    mouth.rotation.x = Math.PI / 2;
+    mouth.position.set(0, 0.55, 1.3);
+    mouth.scale.set(1.2, 1.0, 1.0);
     group.userData.nozzle = mouth;
   } else {
     mouth.position.set(0, -0.25, 0.51);
   }
   group.add(mouth);
+
+  if (type === 'shield') {
+    const shieldMaterial = new THREE.MeshStandardMaterial({
+      color: 0x62e1ff,
+      emissive: 0x155e75,
+      emissiveIntensity: 1.2,
+      transparent: true,
+      opacity: 0.78,
+      metalness: 0.7,
+      roughness: 0.25,
+    });
+    const shieldMesh = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.8, 0.18), shieldMaterial);
+    shieldMesh.position.set(0, 0.05, 0.7);
+    shieldMesh.castShadow = true;
+    group.add(shieldMesh);
+    group.userData.shieldMesh = shieldMesh;
+  }
 
   // Health Bar
   const healthBarGroup = new THREE.Group();
@@ -1215,6 +1497,8 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
 
   group.userData.health = scaledHealth;
   group.userData.maxHealth = scaledHealth;
+  group.userData.shieldHealth = Number(variant.shieldHealth || 0);
+  group.userData.maxShieldHealth = group.userData.shieldHealth;
   group.userData.speed = scaledSpeed;
   group.userData.baseScale = scaledBaseScale;
   group.userData.variant = type;
@@ -1233,14 +1517,19 @@ function createEnemy(x, z, health = 100, speed = 3, color = 0xff4444, scale = 1,
   group.userData.summonTimer = 0;
   group.userData.summonCooldown = 0;
   group.userData.projectileCooldown = 1.2;
+  group.userData.ATM = Number(variant.ATM || 0);
   group.userData.firePattern = 0;
   group.userData.burstRemaining = 0;
   group.userData.burstTimer = 0;
+  group.userData.flyingShotCooldown = 1.8;
+  group.userData.teleportCooldown = 60;
+  group.userData.teleportCharge = 0;
+  group.userData.secondLifeUsed = false;
 
   createEnemyScars(group);
   updateEnemyScars(group);
 
-  group.position.set(x, 1.3, z);
+  group.position.set(x, type === 'flying' ? 5.5 : 1.3, z);
   scene.add(group);
 
   // Create and add a BoxHelper to visualize the enemy's hitbox
@@ -1264,7 +1553,7 @@ function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss', 
   const pMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: variant === 'heavy' ? 0.3 : 0.6 });
   const projectile = new THREE.Mesh(pGeo, pMat);
   projectile.position.copy(sourcePos);
-  projectile.position.y += 1.2;
+  if (variant !== 'boss') projectile.position.y += 1.2;
 
   const dir = directionOverride
     ? directionOverride.clone().normalize()
@@ -1286,11 +1575,16 @@ function spawnBossProjectile(sourcePos, color, sizeScale = 1, variant = 'boss', 
 
   scene.add(projectile);
   projectiles.push(projectile);
+
+  if (variant === 'boss') {
+    playSfx('bossShot');
+  } else if (variant === 'flying' || variant === 'teleporter') {
+    playSfx('shot');
+  }
 }
 
 function bossHasLineOfSight(enemy) {
-  const source = enemy.position.clone();
-  source.y += 0.7 * (enemy.userData.baseScale || 1);
+  const source = getBossNozzleMuzzle(enemy);
   const target = player.position.clone();
   const direction = target.clone().sub(source);
   const distance = direction.length();
@@ -1299,18 +1593,21 @@ function bossHasLineOfSight(enemy) {
   direction.normalize();
   const raycaster = new THREE.Raycaster(source, direction, 0, distance);
   const hits = raycaster.intersectObjects(walls, true);
-  return hits.length === 0;
+  return !hits.some((hit) => hit.distance < distance - 0.35);
 }
 
 function getBossNozzleMuzzle(enemy) {
   enemy.updateMatrixWorld(true);
   const muzzle = enemy.userData.nozzle
-    ? enemy.userData.nozzle.localToWorld(new THREE.Vector3(0, 0, -0.48))
+    ? enemy.userData.nozzle.localToWorld(new THREE.Vector3(0, 0.42, 0))
     : enemy.position.clone();
   return muzzle;
 }
 
 function fireBossPattern(enemy) {
+  // The turret and nozzle must face the player even when the tank is stationary.
+  enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
+  enemy.updateMatrixWorld(true);
   const muzzle = getBossNozzleMuzzle(enemy);
   const toPlayer = player.position.clone().sub(muzzle).normalize();
   const color = enemy.userData.color || 0xff5544;
@@ -1322,6 +1619,7 @@ function fireBossPattern(enemy) {
     // Rapid fire: a short five-round burst from the nozzle.
     enemy.userData.burstRemaining = 5;
     enemy.userData.burstTimer = 0;
+    fireBossRapidBurst(enemy);
     return;
   }
 
@@ -1351,6 +1649,8 @@ function fireBossPattern(enemy) {
 
 function fireBossRapidBurst(enemy) {
   if (enemy.userData.burstRemaining <= 0) return;
+  enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
+  enemy.updateMatrixWorld(true);
   const muzzle = getBossNozzleMuzzle(enemy);
   const direction = player.position.clone().sub(muzzle).normalize();
   spawnBossProjectile(muzzle, enemy.userData.color || 0xff5544, enemy.userData.baseScale || 1, 'boss', direction, {
@@ -1375,7 +1675,7 @@ function summonNecromancerMinions(enemy) {
 
   enemy.userData.summonTriggered = true;
   enemy.userData.summonTimer = 1.5;
-  enemy.userData.projectileCooldown = 1.2;
+  enemy.userData.projectileCooldown = getAbilityCooldown(enemy, 1.2);
 
   const summonRing = new THREE.Mesh(
     new THREE.TorusGeometry(1.2, 0.08, 10, 36),
@@ -1452,9 +1752,98 @@ function updateNecromancer(enemy, delta) {
       projectile.userData.variant = 'necromancer';
       scene.add(projectile);
       projectiles.push(projectile);
-      enemy.userData.projectileCooldown = 1.6 + Math.random() * 0.8;
+      enemy.userData.projectileCooldown = getAbilityCooldown(enemy, 1.6) + Math.random() * 0.8;
     }
   }
+}
+
+function updateFlyingEnemy(enemy, delta) {
+  if (enemy.userData.variant !== 'flying' || enemy.userData.dead) return;
+
+  enemy.position.y = 5.5 + Math.sin(clock.elapsedTime * 2 + enemy.position.x) * 0.35;
+  enemy.userData.flyingShotCooldown = Math.max(0, enemy.userData.flyingShotCooldown - delta);
+  if (enemy.userData.flyingShotCooldown > 0 || enemy.position.distanceTo(player.position) > 34) return;
+
+  enemy.lookAt(player.position.x, enemy.position.y, player.position.z);
+  const origin = enemy.position.clone();
+  const direction = player.position.clone().sub(origin).normalize();
+  const spread = 0.16;
+
+  for (let index = -1; index <= 1; index += 1) {
+    const shotDirection = direction.clone();
+    shotDirection.x += index * spread;
+    shotDirection.normalize();
+    spawnBossProjectile(origin, enemy.userData.color || 0x9b7cff, 0.7, 'flying', shotDirection, {
+      damage: 14,
+      life: 5,
+    });
+    const projectile = projectiles[projectiles.length - 1];
+    if (projectile) projectile.userData.sourceEnemy = enemy;
+  }
+
+  enemy.userData.flyingShotCooldown = 3.2;
+}
+
+function updateTeleporterEnemy(enemy, delta) {
+  if (enemy.userData.variant !== 'teleporter' || enemy.userData.dead) return;
+
+  if (enemy.userData.teleportCharge > 0) {
+    enemy.userData.teleportCharge = Math.max(0, enemy.userData.teleportCharge - delta);
+    if (enemy.userData.teleportMarker) {
+      enemy.userData.teleportMarker.material.opacity = 0.45 + Math.sin(clock.elapsedTime * 12) * 0.25;
+    }
+    if (enemy.userData.teleportCharge === 0 && enemy.userData.teleportDestination) {
+      const destination = enemy.userData.teleportDestination;
+      enemy.position.set(destination.x, 1.3, destination.z);
+      if (enemy.userData.teleportMarker) {
+        scene.remove(enemy.userData.teleportMarker);
+        enemy.userData.teleportMarker = null;
+      }
+
+      const direction = player.position.clone().sub(enemy.position).normalize();
+      spawnBossProjectile(enemy.position, enemy.userData.color || 0xff63c8, 0.9, 'teleporter', direction, {
+        damage: 18,
+        life: 8,
+      });
+      const projectile = projectiles[projectiles.length - 1];
+      if (projectile) projectile.userData.sourceEnemy = enemy;
+      createExplosion(enemy.position, 0xff63c8);
+      enemy.userData.teleportDestination = null;
+    }
+    return;
+  }
+
+  enemy.userData.teleportCooldown = Math.max(0, enemy.userData.teleportCooldown - delta);
+  if (enemy.userData.teleportCooldown > 0) return;
+
+  let destination = null;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const candidate = {
+      x: -30 + Math.random() * 60,
+      z: -30 + Math.random() * 60,
+    };
+    if (
+      Math.hypot(candidate.x - player.position.x, candidate.z - player.position.z) >= 18 &&
+      !checkEnemyCollisionAtPosition(candidate.x, 1.3, candidate.z, enemy.userData.baseScale || 1, 'teleporter') &&
+      !checkEnemySpawnOverlap(candidate.x, 1.3, candidate.z, enemy.userData.baseScale || 1, 'teleporter')
+    ) {
+      destination = candidate;
+      break;
+    }
+  }
+  if (!destination) return;
+
+  const marker = new THREE.Mesh(
+    new THREE.RingGeometry(0.8, 1.3, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff63c8, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
+  );
+  marker.rotation.x = -Math.PI / 2;
+  marker.position.set(destination.x, 0.04, destination.z);
+  scene.add(marker);
+  enemy.userData.teleportMarker = marker;
+  enemy.userData.teleportDestination = destination;
+  enemy.userData.teleportCharge = 0.8;
+  status.textContent = 'Teleporter locking a new position.';
 }
 
 function updateEnemyHealthBar(enemy) {
@@ -1483,12 +1872,56 @@ function updateEnemyHealthBar(enemy) {
 
 function damageEnemy(enemy, amount) {
   if (!enemy?.userData || enemy.userData.dead) return false;
-  enemy.userData.health -= amount;
+  let remainingDamage = Math.max(0, Number(amount) || 0);
+  if (enemy.userData.shieldHealth > 0) {
+    const absorbed = Math.min(enemy.userData.shieldHealth, remainingDamage);
+    enemy.userData.shieldHealth -= absorbed;
+    remainingDamage -= absorbed;
+    if (enemy.userData.shieldMesh) {
+      enemy.userData.shieldMesh.material.opacity = Math.max(0.2, enemy.userData.shieldHealth / enemy.userData.maxShieldHealth * 0.78);
+    }
+    if (enemy.userData.shieldHealth <= 0) {
+      enemy.userData.shieldMesh?.material && (enemy.userData.shieldMesh.material.opacity = 0);
+      enemy.userData.shieldBroken = true;
+      status.textContent = 'Shield broken. Enemy defenseless.';
+    }
+  }
+  if (remainingDamage > 0) {
+    playSfx('enemyHit');
+    makeVfxBurst(enemy.position, enemy.userData.color || 0xffffff, 4, 0.10);
+  }
+  enemy.userData.health -= remainingDamage;
   updateEnemyHealthBar(enemy);
 
   if (enemy.userData.health <= 0) {
+    if (enemy.userData.variant === 'secondlife' && !enemy.userData.secondLifeUsed) {
+      enemy.userData.secondLifeUsed = true;
+      enemy.userData.health = 150;
+      enemy.userData.maxHealth = 150;
+      enemy.userData.dead = false;
+      updateEnemyHealthBar(enemy);
+      createExplosion(enemy.position, 0xb6ff68);
+      makeVfxBurst(enemy.position, 0xb6ff68, 8, 0.14);
+      playSfx('spawn');
+      status.textContent = 'Second-life enemy revived. Finish it again.';
+      return false;
+    }
     enemy.userData.dead = true;
-    createExplosion(enemy.position, enemy.userData.color);
+    if (enemy.userData.variant === 'exploding') {
+      const explosionRadius = 5;
+      createExplosion(enemy.position, 0xff8a3d);
+      makeVfxShockwave(enemy.position, 0xff8a3d, explosionRadius);
+      playSfx('explosion');
+      if (enemy.position.distanceTo(player.position) <= explosionRadius + 1) {
+        damagePlayer(35);
+      }
+      status.textContent = 'Exploding enemy detonated.';
+    }
+    if (enemy.userData.variant !== 'exploding') {
+      createExplosion(enemy.position, enemy.userData.color);
+      makeVfxBurst(enemy.position, enemy.userData.color || 0xff4444, 8, 0.14);
+    }
+    playSfx('enemyDown');
     const dropCount = enemy.userData.baseScale > 1 ? 4 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 2);
     for (let i = 0; i < dropCount; i++) {
       const offsetX = (Math.random() - 0.5) * 2;
@@ -1502,6 +1935,10 @@ function damageEnemy(enemy, amount) {
     if (enemy.userData.summonRing) {
       scene.remove(enemy.userData.summonRing);
       enemy.userData.summonRing = null;
+    }
+    if (enemy.userData.teleportMarker) {
+      scene.remove(enemy.userData.teleportMarker);
+      enemy.userData.teleportMarker = null;
     }
     
     score += 100;
@@ -1517,24 +1954,57 @@ function damageEnemy(enemy, amount) {
   return false;
 }
 
+function getEnemySpawnRadius(type = 'normal', scale = 1) {
+  const variant = getEnemyVariantConfig(type, 0xff4444, 0x000000);
+  const width = (variant.bodyGeometry.parameters?.width || 1) * 0.9;
+  const depth = (variant.bodyGeometry.parameters?.depth || 1) * 0.9;
+  const radius = Math.max(width, depth) * 0.5;
+  return radius * scale;
+}
+
 // Helper function to check if a potential enemy spawn position collides with walls
-function checkEnemyCollisionAtPosition(x, y, z, scale) {
-  const tempEnemy = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)); // Use a generic box for collision
+function checkEnemyCollisionAtPosition(x, y, z, scale, type = 'normal') {
+  if (Math.abs(x) > 36 || Math.abs(z) > 36) return true;
+
+  const radius = getEnemySpawnRadius(type, scale);
+  const tempEnemy = new THREE.Mesh(new THREE.BoxGeometry(radius * 2 + 0.6, 2.8 + 0.6, radius * 2 + 0.6));
   tempEnemy.position.set(x, y, z);
-  tempEnemy.scale.set(scale, scale, scale); // Apply scale to the temporary enemy
-  tempEnemy.updateMatrixWorld(true); // Ensure world matrix is updated for accurate bounding box
+  tempEnemy.scale.set(scale, scale, scale);
+  tempEnemy.updateMatrixWorld(true);
 
   const enemyBox = new THREE.Box3().setFromObject(tempEnemy);
-  for (const wall of walls) {
-    const box = new THREE.Box3().setFromObject(wall);
+  for (const box of wallHitboxes) {
     if (enemyBox.intersectsBox(box)) return true;
   }
+  return false;
+}
+
+function checkEnemySpawnOverlap(x, y, z, scale, type = 'normal') {
+  const radius = getEnemySpawnRadius(type, scale);
+  const minSeparation = radius + 0.9;
+
+  for (const enemy of [...enemies, ...pendingEnemies]) {
+    if (!enemy || enemy.userData?.dead) continue;
+
+    const otherType = enemy.userData?.variant || 'normal';
+    const otherBaseScale = enemy.userData?.baseScale || 1;
+    const otherRadius = getEnemySpawnRadius(otherType, otherBaseScale);
+    const dx = enemy.position.x - x;
+    const dz = enemy.position.z - z;
+    const distance = Math.hypot(dx, dz);
+
+    if (distance < minSeparation + otherRadius) {
+      return true;
+    }
+  }
+
   return false;
 }
 
 function damagePlayer(amount) {
   player.health -= amount;
   if (player.health < 0) player.health = 0;
+  if (amount > 0) playSfx('playerHit');
   if (player.health <= Math.max(25, player.maxHealth * 0.25)) {
     triggerHpFlash();
   }
@@ -1606,6 +2076,11 @@ function createExplosion(position, color) {
     scene.add(fragment);
     fragments.push(fragment);
   }
+
+  const shockRadius = Math.max(1.5, color === 0xff8a3d ? 2.8 : 1.4);
+  makeVfxShockwave(position, color, shockRadius);
+  makeVfxBurst(position, color, 12, 0.16);
+  playSfx('explosion');
 }
 
 const player = {
@@ -1643,6 +2118,68 @@ const perkModifiers = {
   eclipse: { maxHealthBoost: 24 },
 };
 
+const perkModifierAliases = {
+  'common-1': 'fortified',
+  'common-2': 'swift',
+  'uncommon-1': 'impact',
+  'uncommon-2': 'aegis',
+  'uncommon-3': 'guardian',
+  'rare-1': 'storm',
+  'rare-2': 'overdrive',
+  'rare-3': 'phantom',
+  'rare-4': 'voltage',
+  'epic-1': 'starlit',
+  'epic-2': 'berserker',
+  'epic-3': 'sentinel',
+  'legendary-1': 'vanguard',
+  'legendary-2': 'cascade',
+  'mythic-1': 'nova',
+  'ascended-1': 'eclipse',
+};
+
+const perkNames = {
+  'common-1': 'Fortified Frame', 'common-2': 'Swift Step', 'common-3': 'Quick Draw', 'common-4': 'Dust Guard',
+  'common-5': 'Cartographer', 'common-6': 'Second Breath', 'common-7': 'Spark Thread',
+  'uncommon-1': 'Brutal Impacts', 'uncommon-2': 'Aegis Guard', 'uncommon-3': 'Guardian Pulse',
+  'uncommon-4': 'Trail Runner', 'uncommon-5': 'Glass Breaker', 'uncommon-6': 'Steel Linings', 'uncommon-7': 'Phase Dash',
+  'rare-1': 'Storm Sprint', 'rare-2': 'Overdrive Core', 'rare-3': 'Phantom Drift', 'rare-4': 'Voltage Edge',
+  'rare-5': 'Mender Relay', 'rare-6': 'Bastion Step', 'rare-7': 'Charge Lattice',
+  'epic-1': 'Starlit Core', 'epic-2': 'Berserker Rites', 'epic-3': 'Sentinel Shell', 'epic-4': 'Nova Circuit',
+  'epic-5': 'Rift Walker', 'epic-6': 'Iron Choir', 'epic-7': 'Violet Surge',
+  'legendary-1': 'Vanguard Defense', 'legendary-2': 'Cascade Step', 'legendary-3': 'Hammer Bloom',
+  'legendary-4': 'Halo Guard', 'legendary-5': 'Aether Thread', 'legendary-6': 'Flux Runner', 'legendary-7': 'Last Stand',
+  'mythic-1': 'Nova Striker', 'mythic-2': 'Prism Tempest', 'mythic-3': 'Onyx Pulse', 'mythic-4': 'Skybreak',
+  'mythic-5': 'Storm Ritual', 'mythic-6': 'Obsidian Echo', 'mythic-7': 'Chrono Bend',
+  'ascended-1': 'Eclipse Guard', 'ascended-2': 'Celestial Crown', 'ascended-3': 'Nullfire Prime',
+  'ascended-4': 'Abyss Walker', 'ascended-5': 'Imperial Shell', 'ascended-6': 'Radiant Verdict', 'ascended-7': 'Godline Core',
+};
+
+function getPerkModifier(perkId) {
+  const modifierKey = perkModifierAliases[perkId];
+  if (modifierKey && perkModifiers[modifierKey]) return perkModifiers[modifierKey];
+
+  const [rarity, slotText] = String(perkId || '').split('-');
+  const slot = Math.max(1, Number(slotText) || 1);
+  const tier = {
+    common: 1,
+    uncommon: 2,
+    rare: 3,
+    epic: 4,
+    legendary: 5,
+    mythic: 6,
+    ascended: 7,
+  }[rarity] || 1;
+
+  const profile = (slot - 1) % 3;
+  if (profile === 0) return { maxHealthBoost: tier * 5 + slot };
+  if (profile === 1) return { damageBoost: tier * 2 + slot };
+  return { speedBoost: tier * 0.18, jumpBoost: tier * 0.12 };
+}
+
+function getPerkDisplayName(perkId) {
+  return perkNames[perkId] || String(perkId || 'None').replace(/-/g, ' ');
+}
+
 function getPurchasedPerks() {
   try {
     const raw = JSON.parse(localStorage.getItem('cube_assault_purchased_perks') || '[]');
@@ -1663,16 +2200,20 @@ function applySelectedPerk() {
     player.speed = 8;
     player.attackDamage = 34;
     player.jumpSpeed = 8;
+    player.activePerkName = 'None';
     player.health = Math.min(player.maxHealth, player.maxHealth * previousHealthRatio);
+    updateGameUI();
     return;
   }
 
-  const mod = perkModifiers[perkId] || { };
+  const mod = getPerkModifier(perkId);
   player.maxHealth = 100 + (mod.maxHealthBoost || 0);
   player.speed = 8 + (mod.speedBoost || 0);
   player.attackDamage = 34 + (mod.damageBoost || 0);
   player.jumpSpeed = 8 + (mod.jumpBoost || 0);
+  player.activePerkName = getPerkDisplayName(perkId);
   player.health = Math.min(player.maxHealth, player.maxHealth * previousHealthRatio);
+  updateGameUI();
 }
 
 camera.position.copy(player.position);
@@ -1740,9 +2281,7 @@ function checkEnemyCollision(enemy) {
   enemy.updateMatrixWorld(true);
   const enemyBox = new THREE.Box3().setFromObject(enemy).expandByScalar(0.08);
 
-  for (const wall of walls) {
-    wall.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(wall);
+  for (const box of wallHitboxes) {
     if (enemyBox.intersectsBox(box)) {
       return true;
     }
@@ -1765,9 +2304,9 @@ function keepEnemyOnBaseplate(enemy) {
 
   enemy.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(enemy);
-  if (Number.isFinite(bounds.min.y)) {
+  if (Number.isFinite(bounds.min.y) && bounds.min.y < floorHitbox.max.y) {
     // Move the complete hit box onto the baseplate, including scaled bosses.
-    enemy.position.y += baseplateTop - bounds.min.y;
+    enemy.position.y += floorHitbox.max.y - bounds.min.y;
     enemy.updateMatrixWorld(true);
   }
 }
@@ -1779,9 +2318,7 @@ function collide(position) {
     new THREE.Vector3(position.x - radius, position.y - halfHeight, position.z - radius),
     new THREE.Vector3(position.x + radius, position.y + halfHeight, position.z + radius)
   );
-  for (const wall of walls) {
-    wall.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(wall);
+  for (const box of wallHitboxes) {
     if (playerBox.intersectsBox(box)) {
       return true;
     }
@@ -1795,10 +2332,7 @@ function checkGround() {
   const down = player.position.clone();
   down.y -= 0.6;
   if (down.y <= 0) return true;
-  return walls.some((wall) => {
-    const box = new THREE.Box3().setFromObject(wall);
-    return box.containsPoint(down);
-  });
+  return floorHitbox.containsPoint(down) || wallHitboxes.some((box) => box.containsPoint(down));
 }
 
 function isBlockedForEnemy(enemy, position, radius = 0.9) {
@@ -1808,9 +2342,7 @@ function isBlockedForEnemy(enemy, position, radius = 0.9) {
     new THREE.Vector3(position.x + radius, groundY + 0.8, position.z + radius)
   );
 
-  for (const wall of walls) {
-    wall.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(wall);
+  for (const box of wallHitboxes) {
     if (enemyBox.intersectsBox(box)) {
       return true;
     }
@@ -2044,17 +2576,23 @@ function animate() {
       enemy.userData.shootTimer = (enemy.userData.shootTimer || 0) - delta;
       enemy.userData.burstTimer = Math.max(0, (enemy.userData.burstTimer || 0) - delta);
       const distanceToPlayer = enemy.position.distanceTo(player.position);
-      const hasLineOfSight = distanceToPlayer <= 32 && bossHasLineOfSight(enemy);
-      if (hasLineOfSight && enemy.userData.burstRemaining > 0 && enemy.userData.burstTimer <= 0) {
+      const inFiringRange = distanceToPlayer <= 32;
+      if (inFiringRange && enemy.userData.burstRemaining > 0 && enemy.userData.burstTimer <= 0) {
         fireBossRapidBurst(enemy);
-      } else if (hasLineOfSight && enemy.userData.burstRemaining <= 0 && enemy.userData.shootTimer <= 0) {
+      } else if (inFiringRange && enemy.userData.burstRemaining <= 0 && enemy.userData.shootTimer <= 0) {
         fireBossPattern(enemy);
-        enemy.userData.shootTimer = 4.5 + Math.random() * 1.5;
+        enemy.userData.shootTimer = getAbilityCooldown(enemy, 4.5) + Math.random() * 1.5;
       }
     }
 
     if (enemy.userData.variant === 'necromancer') {
       updateNecromancer(enemy, delta);
+    }
+    if (enemy.userData.variant === 'flying') {
+      updateFlyingEnemy(enemy, delta);
+    }
+    if (enemy.userData.variant === 'teleporter') {
+      updateTeleporterEnemy(enemy, delta);
     }
 
     // Update the visual helper as the enemy moves
@@ -2323,53 +2861,50 @@ window.addEventListener('mousemove', (event) => {
 
 function checkAttack() {
   if (shopState.open) return;
-  // Get the direction the camera is facing
+  playSfx('shot');
+  makeVfxBurst(player.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 2.0), 0xffedb3, 2, 0.08);
+
   const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  // Define the center of the attack area in front of the player
   const attackPos = player.position.clone().addScaledVector(direction, 1.5);
-  
-  // Define the attack hitbox dimensions
   const attackBox = new THREE.Box3().setFromCenterAndSize(
     attackPos,
     new THREE.Vector3(2, 2, 2)
   );
 
-  // Iterate backwards to safely remove enemies during the loop
   for (let i = enemies.length - 1; i >= 0; i--) {
     const enemy = enemies[i];
-    enemy.updateWorldMatrix(true, true); // Ensure hitbox is calculated on current position
+    enemy.updateWorldMatrix(true, true);
     const enemyBox = new THREE.Box3().setFromObject(enemy);
 
     if (attackBox.intersectsBox(enemyBox)) {
-      if (damageEnemy(enemy, player.attackDamage)) { // Apply damage, check if defeated
-        enemies.splice(i, 1); // Remove from array if defeated
+      if (damageEnemy(enemy, player.attackDamage)) {
+        enemies.splice(i, 1);
       }
-      // Trigger knockback effect
       const impactDir = new THREE.Vector3().subVectors(enemy.position, player.position);
       impactDir.y = 0;
       impactDir.normalize();
       enemy.userData.knockbackDir.copy(impactDir);
-      enemy.userData.knockbackForce = 0.5; // Intensity of the push
+      enemy.userData.knockbackForce = 0.5;
     }
   }
-  
-  // Reflect boss projectiles when the player attacks.
+
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const projectile = projectiles[i];
     const projectileBox = new THREE.Box3().setFromObject(projectile);
     if (attackBox.intersectsBox(projectileBox)) {
-      projectile.userData.velocity.copy(direction).multiplyScalar(18);
+      projectile.userData.velocity.normalize().negate().multiplyScalar(18);
       projectile.userData.reflected = true;
       projectile.userData.life = 3.5;
       if (projectile.material && projectile.material.emissive) {
         projectile.material.emissive.setHex(0x88ffff);
         projectile.material.emissiveIntensity = 0.9;
       }
-        // Make reflected projectiles larger and more damaging
-        const reflectSizeMul = 1.6;
-        if (projectile.scale) projectile.scale.multiplyScalar(reflectSizeMul);
-        projectile.userData.damage = Math.ceil((projectile.userData.damage || 12) * 1.9);
-        projectile.userData.velocity.multiplyScalar(1.15);
+      const reflectSizeMul = 1.6;
+      if (projectile.scale) projectile.scale.multiplyScalar(reflectSizeMul);
+      projectile.userData.damage = Math.ceil((projectile.userData.damage || 12) * 1.9);
+      projectile.userData.velocity.multiplyScalar(1.15);
+      playSfx('reflect');
+      makeVfxBurst(projectile.position, 0x88ffff, 4, 0.12);
     }
   }
 }

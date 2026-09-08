@@ -167,6 +167,7 @@
                         email: localAccount.email || '',
                         cubotics: Number(localAccount.cubotics || 0),
                         neonShards: Number(localAccount.neonShards || 0),
+                        activePerk: localAccount.activePerk || localStorage.getItem('cube_assault_perk') || null,
                       }));
                       setTimeout(() => window.location.href = 'account.html', 1000);
                       return;
@@ -185,6 +186,9 @@
                   email: result.email || '',
                   cubotics: Number(result.cubotics || 0),
                   neonShards: Number(result.neonShards || 0),
+                  activePerk: (JSON.parse(localStorage.getItem('cube_assault_account') || 'null')?.username === payload.username
+                    ? JSON.parse(localStorage.getItem('cube_assault_account') || 'null')?.activePerk
+                    : null),
                 }));
                 setTimeout(() => window.location.href = 'account.html', 1000);
                 return;
@@ -205,6 +209,7 @@
                   email: localAccount.email || '',
                   cubotics: Number(localAccount.cubotics || 0),
                   neonShards: Number(localAccount.neonShards || 0),
+                  activePerk: localAccount.activePerk || localStorage.getItem('cube_assault_perk') || null,
                 }));
                 setTimeout(() => window.location.href = 'account.html', 1000);
               }
